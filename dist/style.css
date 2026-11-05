@@ -125,6 +125,8 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 #worksheetTabs button { flex: none; align-self: stretch; padding: .3rem .8rem; white-space: nowrap; color: #415875; border-radius: 0; border-top: 2px solid transparent; }
 #worksheetTabs button[aria-current="true"] { color: #164f8e; background: white; border-top-color: var(--accent); font-weight: 600; }
 .sheet-horizontal-control { display: flex; align-items: center; gap: .25rem; height: 1.75rem; padding: 0 .35rem; background: #e9edf3; border-top: 1px solid var(--line); }
+.sheet-horizontal-control label { flex: none; color: var(--muted); font-size: .78rem; }
+.sheet-horizontal-control select { flex: none; max-width: 5rem; border: 1px solid var(--line); background: white; font-size: .78rem; }
 .sheet-horizontal-control input { flex: 1; min-width: 0; margin: 0; accent-color: var(--accent); }
 .sheet-horizontal-control input:disabled { opacity: .4; }
 .sheet-pagination { display: flex; align-items: center; gap: .3rem; margin-left: auto; padding-right: .4rem; font-size: .85rem; }

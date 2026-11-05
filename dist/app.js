@@ -155,6 +155,28 @@ new ResizeObserver(updateHorizontalScroll).observe($('worksheet'));
 new ResizeObserver(updateHorizontalScroll).observe($('tableScroll'));
 function renderColumns(){for(const id of ['response','predictor']){const prev=$(id).value;$(id).innerHTML=data.headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');if(prev!==''&&Number(prev)<data.headers.length)$(id).value=prev;}if($('predictor').value===$('response').value&&data.headers.length>1)$('predictor').value=String((+$('response').value+1)%data.headers.length);}
 $('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined)data.rows[+el.dataset.row][c]=el.value;else{data.headers[c]=el.value;renderColumns();}dirty();});
+$('enterDirection').value = (() => { try { return localStorage.getItem('jmptab-enter-direction') === 'right' ? 'right' : 'down'; } catch { return 'down'; } })();
+$('enterDirection').onchange = () => { try { localStorage.setItem('jmptab-enter-direction', $('enterDirection').value); } catch { /* Keep the current selection. */ } };
+$('worksheet').addEventListener('keydown', event => {
+  const cell = event.target;
+  if (event.key !== 'Enter' || event.isComposing || !cell.matches('td input')) return;
+  event.preventDefault();
+  let row = Number(cell.dataset.row);
+  let column = Number(cell.dataset.col);
+  if ($('enterDirection').value === 'right') {
+    if (++column >= data.headers.length) { column = 0; row++; }
+  } else row++;
+  if (row >= MAX_ROWS) return;
+  if (row >= data.rows.length) {
+    data.rows.push(Array(data.headers.length).fill(''));
+    dirty();
+  }
+  if (Math.floor(row / PAGE_SIZE) + 1 !== page || row >= data.rows.length - 1) {
+    page = Math.floor(row / PAGE_SIZE) + 1;
+    renderSheet();
+  }
+  $('worksheet').querySelector(`td input[data-row="${row}"][data-col="${column}"]`)?.focus();
+});
 $('worksheet').addEventListener('paste',e=>{const el=e.target;if(!el.matches('td input'))return;const text=e.clipboardData.getData('text');if(!/[\t\n]/.test(text))return;e.preventDefault();const incoming=text.replace(/\r/g,'').trimEnd().split('\n').map(r=>r.split('\t')),r=+el.dataset.row,c=+el.dataset.col;if(r+incoming.length>MAX_ROWS||c+incoming.reduce((width, row) => Math.max(width, row.length), 0)>30){message('Paste up to 1,000,000 rows and 30 columns.');return;}while(data.headers.length<c+incoming.reduce((width, row) => Math.max(width, row.length), 0))data.headers.push(`Column ${data.headers.length+1}`);data.rows.forEach(row=>{while(row.length<data.headers.length)row.push('');});while(data.rows.length<r+incoming.length)data.rows.push(Array(data.headers.length).fill(''));incoming.forEach((row,i)=>row.forEach((v,j)=>data.rows[r+i][c+j]=v));dirty();renderSheet();});
 function updateSettings(){const type=$('analysis').value;$('predictorField').hidden=type!=='regression'&&type!=='correlation';document.querySelectorAll('.spec').forEach(el=>el.hidden=type!=='capability');$('pFields').hidden=type!=='p-chart';$('xbarFields').hidden=type!=='xbar-chart';$('maFields').hidden=type!=='moving-average';$('esFields').hidden=type!=='exponential-smoothing';$('tFields').hidden=type!=='one-sample-t';$('responseField').hidden=type==='one-sample-t'&&$('tSource').value==='summary';$('tSummaryFields').hidden=$('tSource').value!=='summary';$('tNullField').hidden=!$('tTest').checked;}
 $('analysis').onchange=updateSettings;

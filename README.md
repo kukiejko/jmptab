@@ -18,6 +18,8 @@ Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a col
 
 Use **+** beside the worksheet tabs to add a blank worksheet. The first, previous, next, and last buttons switch between worksheets. The bar below the tabs scrolls wide worksheets horizontally. Save session stores every worksheet and the active tab; Export CSV exports the active worksheet.
 
+Choose **Enter moves: Down** or **Right** beside the horizontal scroll bar to control which cell receives focus after pressing Enter. The choice is stored in this browser.
+
 ## Code layout and testing
 
 - `dist/stats.js`, `dist/inference.js`, `dist/quality.js`, and `dist/time-series.js` contain browser-independent calculations.
