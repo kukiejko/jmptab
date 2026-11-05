@@ -1,6 +1,7 @@
 import { setupGraphBuilder } from './graph-builder.js';
 import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
+import { createResizableLayout } from './layout-resize.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -20,12 +21,25 @@ function message(text) {
 function dirty(){unsaved=true;revision++;$('saveState').textContent='Unsaved changes';$('resultSubtitle').textContent='Worksheet changed · run analysis to refresh';}
 const PAGE_SIZE = 200;
 let page = 1;
+const layout = createResizableLayout({
+  workbench: document.querySelector('.workbench'),
+  navigator: $('navigator'),
+  navHandle: $('navResizer'),
+  panes: document.querySelector('.panes'),
+  paneHandle: $('paneResizer'),
+  table: $('worksheet'),
+  tableScroll: document.querySelector('.table-scroll')
+});
 
 function renderSheet() {
   const pageCount = Math.max(1, Math.ceil(data.rows.length / PAGE_SIZE));
   page = Math.min(page, pageCount);
   const start = (page - 1) * PAGE_SIZE;
-  const headers = data.headers.map((_, index) => '<th scope="col">C' + (index + 1) + '</th>').join('');
+  const widths = layout.widthsFor(data.headers.length);
+  const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
+  const headers = data.headers.map((_, index) =>
+    `<th scope="col">C${index + 1}<button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="800" title="Drag to resize column; double-click to reset"></button></th>`
+  ).join('');
   const names = data.headers.map((name, column) =>
     `<th><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`
   ).join('');
@@ -36,7 +50,8 @@ function renderSheet() {
     ).join('');
     return `<tr><td>${(index + 1).toLocaleString('en-US')}</td>${cells}</tr>`;
   }).join('');
-  $('worksheet').innerHTML = `<thead><tr><th scope="col">#</th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
+  $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col">#</th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
+  layout.applyColumnWidths();
   $('sheetCount').textContent = `${data.rows.length.toLocaleString('en-US')} rows · ${data.headers.length} columns`;
   $('sheetPage').value = page;
   $('sheetPage').max = pageCount;
