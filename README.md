@@ -17,6 +17,7 @@ Use **Open CSV/XML** to import a CSV file or a tabular XML file. Row-based XML u
 Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a column's right-edge grip in the C1/C2 header to change its width, or double-click it to fit the widest header or cell value across all rows. Double-click a pane divider to reset it; arrow keys also work when a grip has focus. Dialogs resize from their lower-right corner. Pane and column sizes are stored in this browser.
 
 Use **+** beside the worksheet tabs to add a blank worksheet. The first, previous, next, and last buttons switch between worksheets. The bar below the tabs scrolls wide worksheets horizontally. Save session stores every worksheet and the active tab; Export CSV exports the active worksheet.
+Double-click a worksheet tab or focus it and press F2 to rename it. Press Enter to save the name or Escape to cancel.
 
 Choose **Enter moves: Down** or **Right** beside the horizontal scroll bar to control which cell receives focus after pressing Enter. The choice is stored in this browser.
 

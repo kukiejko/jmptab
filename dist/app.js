@@ -3,7 +3,7 @@ import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
 import { parseXML } from './xml-import.js';
-import { blankWorksheet, nextWorksheetName, validWorksheet } from './workbook.js';
+import { blankWorksheet, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -72,7 +72,7 @@ function renderSheet() {
 
 function renderSheetTabs() {
   $('worksheetTabs').innerHTML = worksheets.map((sheet, index) =>
-    `<button type="button" data-sheet-index="${index}" aria-current="${index === activeSheetIndex}" aria-label="Open ${esc(sheet.name)}">${esc(sheet.name)}</button>`
+    `<button type="button" data-sheet-index="${index}" aria-current="${index === activeSheetIndex}" aria-label="Open ${esc(sheet.name)}" title="Double-click or press F2 to rename">${esc(sheet.name)}</button>`
   ).join('');
   $('firstSheet').disabled = $('previousSheet').disabled = activeSheetIndex === 0;
   $('lastSheet').disabled = $('nextSheet').disabled = activeSheetIndex === worksheets.length - 1;
@@ -130,6 +130,51 @@ function switchSheet(index) {
 $('worksheetTabs').onclick = event => {
   const tab = event.target.closest('[data-sheet-index]');
   if (tab) switchSheet(Number(tab.dataset.sheetIndex));
+};
+function editSheetName(tab) {
+  const index = Number(tab.dataset.sheetIndex);
+  const input = document.createElement('input');
+  input.className = 'sheet-name-editor';
+  input.setAttribute('aria-label', 'Worksheet name');
+  input.maxLength = 50;
+  input.value = worksheets[index].name;
+  tab.replaceWith(input);
+  input.focus();
+  input.select();
+  let finished = false;
+  function finish(save) {
+    if (finished) return;
+    finished = true;
+    if (save) {
+      try {
+        const previous = renameWorksheet(worksheets, index, input.value);
+        if (previous !== worksheets[index].name) {
+          for (const result of history) if (result.sheetName === previous) result.sheetName = worksheets[index].name;
+          revision++;
+          unsaved = true;
+          $('saveState').textContent = 'Unsaved changes';
+          renderHistory();
+        }
+        message('');
+      } catch (error) { message(error.message); }
+    }
+    renderSheetTabs();
+  }
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); finish(true); }
+    if (event.key === 'Escape') { event.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+$('worksheetTabs').ondblclick = event => {
+  const tab = event.target.closest('[data-sheet-index]');
+  if (tab) editSheetName(tab);
+};
+$('worksheetTabs').onkeydown = event => {
+  if (event.key === 'F2' && event.target.matches('[data-sheet-index]')) {
+    event.preventDefault();
+    editSheetName(event.target);
+  }
 };
 $('firstSheet').onclick = () => switchSheet(0);
 $('previousSheet').onclick = () => switchSheet(activeSheetIndex - 1);

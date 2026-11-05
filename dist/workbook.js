@@ -12,6 +12,17 @@ export function blankWorksheet(name) {
   return { name, data: { headers, rows: Array.from({ length: 20 }, () => Array(headers.length).fill('')) }, page: 1 };
 }
 
+export function renameWorksheet(worksheets, index, requestedName) {
+  const name = requestedName.trim();
+  if (!name || name.length > 50) throw Error('Worksheet name must contain 1 to 50 characters.');
+  if (worksheets.some((sheet, position) => position !== index && sheet.name.toLowerCase() === name.toLowerCase())) {
+    throw Error('Another worksheet already has that name.');
+  }
+  const previous = worksheets[index].name;
+  worksheets[index].name = name;
+  return previous;
+}
+
 export function validWorksheet(sheet) {
   const data = sheet?.data;
   return typeof sheet.name === 'string' && sheet.name.length > 0 &&

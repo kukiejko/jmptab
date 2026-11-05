@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { blankWorksheet, nextWorksheetName, validWorksheet } from '../dist/workbook.js';
+import { blankWorksheet, nextWorksheetName, renameWorksheet, validWorksheet } from '../dist/workbook.js';
 import { decodeSessionRecords, sessionEntries } from '../dist/session.js';
 
 test('new worksheets have independent blank cells and unique names', () => {
@@ -11,6 +11,14 @@ test('new worksheets have independent blank cells and unique names', () => {
   assert.equal(second.data.rows[0][0], '');
   assert.equal(first.data.headers.length, 15);
   assert.ok(validWorksheet(first));
+});
+
+test('worksheet names are trimmed, unique, and kept in saved data', () => {
+  const worksheets = [blankWorksheet('Worksheet 1'), blankWorksheet('Worksheet 2')];
+  assert.equal(renameWorksheet(worksheets, 0, ' Process data '), 'Worksheet 1');
+  assert.equal(worksheets[0].name, 'Process data');
+  assert.throws(() => renameWorksheet(worksheets, 1, 'process data'), /already/);
+  assert.throws(() => renameWorksheet(worksheets, 1, '  '), /1 to 50/);
 });
 
 test('saved workbook restores every sheet, active tab, and page', () => {
