@@ -22,6 +22,7 @@ Open http://127.0.0.1:4173. Use Stat or Graph to open an analysis dialog, then s
 - `server.mjs` exports `createRequestHandler` and `createServer`. `tests/server.test.mjs` checks the metadata and static responses without opening a network port.
 
 Run `npm test` after changing calculations or analysis wiring. The Help dialog displays the package version and the local server start time from `/app-info.json`.
+See [CHANGELOG.md](CHANGELOG.md) for version history and deployment time semantics.
 
 ## Features
 
