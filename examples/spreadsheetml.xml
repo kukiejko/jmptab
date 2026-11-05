@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Measurements">
+    <Table>
+      <Row><Cell><Data ss:Type="String">Diameter</Data></Cell><Cell><Data ss:Type="String">Temperature</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="Number">10.1</Data></Cell><Cell><Data ss:Type="Number">20.5</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="Number">10.3</Data></Cell><Cell><Data ss:Type="Number">22.0</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="Number">9.9</Data></Cell><Cell><Data ss:Type="Number">19.4</Data></Cell></Row>
+    </Table>
+  </Worksheet>
+</Workbook>

@@ -2,6 +2,7 @@ import { setupGraphBuilder } from './graph-builder.js';
 import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
+import { parseXML } from './xml-import.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -179,7 +180,32 @@ function renderHistory() {
 
 $('addRow').onclick=()=>{if(data.rows.length>=MAX_ROWS)return message('Maximum 1,000,000 rows.');data.rows.push(Array(data.headers.length).fill(''));dirty();showPage(Math.ceil(data.rows.length / PAGE_SIZE));const scroll=document.querySelector('.table-scroll');scroll.scrollTop=scroll.scrollHeight;};$('addCol').onclick=()=>{if(data.headers.length>=30)return message('Maximum 30 columns.');data.headers.push(`Column ${data.headers.length+1}`);data.rows.forEach(r=>r.push(''));dirty();renderSheet();};
 function download(name,content,type){const url=URL.createObjectURL(new Blob(typeof content === "string" ? [content] : content,{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
-$('exportBtn').onclick=()=>download('worksheet.csv',csvChunks(data),'text/csv;charset=utf-8');$('reportBtn').onclick=()=>lastReport?download('jmptab-report.txt',lastReport,'text/plain;charset=utf-8'):message('Run an analysis before exporting a report.');$('importBtn').onclick=()=>$('file').click();$('file').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const next=parseCSV(await file.text());if(unsaved&&!confirm('Replace your unsaved worksheet with this CSV? Export or save first to keep your work.'))return;data=next;page=1;history=[];revision=0;unsaved=true;invalidateReport();renderSheet();renderHistory();$('projectName').textContent=file.name.replace(/\.csv$/i,'');$('saveState').textContent='Unsaved changes';run();}catch(e){message(e.message);}finally{$('file').value='';}};
+$('exportBtn').onclick=()=>download('worksheet.csv',csvChunks(data),'text/csv;charset=utf-8');$('reportBtn').onclick=()=>lastReport?download('jmptab-report.txt',lastReport,'text/plain;charset=utf-8'):message('Run an analysis before exporting a report.');
+$('importBtn').onclick = () => $('file').click();
+$('file').onchange = async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    const format = file.name.toLowerCase().endsWith('.xml') ? 'XML' : 'CSV';
+    const next = format === 'XML' ? parseXML(await file.text()) : parseCSV(await file.text());
+    if (unsaved && !confirm(`Replace your unsaved worksheet with this ${format}? Export or save first to keep your work.`)) return;
+    data = next;
+    page = 1;
+    history = [];
+    revision = 0;
+    unsaved = true;
+    invalidateReport();
+    renderSheet();
+    renderHistory();
+    $('projectName').textContent = file.name.replace(/\.(csv|xml)$/i, '');
+    $('saveState').textContent = 'Unsaved changes';
+    run();
+  } catch (error) {
+    message(error.message);
+  } finally {
+    $('file').value = '';
+  }
+};
 $('sampleBtn').onclick=()=>{if(unsaved&&!confirm('Replace your worksheet with sample data? Export or save first to keep your work.'))return;data=sample();page=1;history=[];revision=0;unsaved=true;invalidateReport();renderSheet();renderHistory();$('analysis').value='summary';$('response').value='0';$('predictor').value='1';updateSettings();$('projectName').textContent='Sample process study';$('saveState').textContent='Unsaved changes';run();};
 $('saveBtn').onclick = async () => {
   const button = $('saveBtn');

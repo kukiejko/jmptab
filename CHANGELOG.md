@@ -2,6 +2,13 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.4 — 2026-11-05
+
+- Release prepared: 2026-11-05 22:39:23 UTC.
+- Deployment time: recorded at local server startup and displayed in Help.
+- Added XML worksheet import for row-based records and Excel 2003 SpreadsheetML.
+- Added XML mapping tests and sample files for both supported layouts.
+
 ## 0.1.3 — 2026-11-05
 
 - Release prepared: 2026-11-05 13:47:33 UTC.

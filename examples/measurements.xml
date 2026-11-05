@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<measurements>
+  <row><Diameter>10.1</Diameter><Temperature>20.5</Temperature><Line>A</Line></row>
+  <row><Diameter>10.3</Diameter><Temperature>22.0</Temperature><Line>B</Line></row>
+  <row><Diameter>9.9</Diameter><Temperature>19.4</Temperature><Line>A</Line></row>
+</measurements>
