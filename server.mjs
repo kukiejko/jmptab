@@ -1,5 +1,62 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-const root=path.join(import.meta.dirname,'dist');
-http.createServer((req,res)=>{const name=decodeURIComponent(req.url.split('?')[0]);const file=path.resolve(root,'.'+(name==='/'?'/index.html':name));if(!file.startsWith(root+path.sep)){res.writeHead(403);return res.end();}fs.readFile(file,(err,data)=>{if(err){res.writeHead(404);return res.end('Not found');}res.setHeader('Content-Type',({'html':'text/html','css':'text/css','js':'text/javascript'})[file.split('.').pop()]||'application/octet-stream');res.end(data);});}).listen(4173,'127.0.0.1',()=>console.log('Local: http://127.0.0.1:4173'));
+import { fileURLToPath } from 'node:url';
+
+const projectRoot = path.dirname(fileURLToPath(import.meta.url));
+const distRoot = path.join(projectRoot, 'dist');
+const { version } = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
+
+function serveFile(requestPath, response) {
+  const relativePath = requestPath === '/' ? '/index.html' : requestPath;
+  const file = path.resolve(distRoot, '.' + relativePath);
+
+  if (!file.startsWith(distRoot + path.sep)) {
+    response.writeHead(403);
+    response.end();
+    return;
+  }
+
+  fs.readFile(file, (error, content) => {
+    if (error) {
+      response.writeHead(404);
+      response.end('Not found');
+      return;
+    }
+
+    const contentTypes = { html: 'text/html', css: 'text/css', js: 'text/javascript' };
+    response.setHeader('Content-Type', contentTypes[path.extname(file).slice(1)] || 'application/octet-stream');
+    response.end(content);
+  });
+}
+
+export function createRequestHandler({ deployedAt = new Date().toISOString() } = {}) {
+  return (request, response) => {
+    let requestPath;
+    try {
+      requestPath = decodeURIComponent(request.url.split('?')[0]);
+    } catch {
+      response.writeHead(400);
+      response.end('Invalid URL');
+      return;
+    }
+
+    if (requestPath === '/app-info.json') {
+      response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      response.end(JSON.stringify({ version, deployedAt }));
+      return;
+    }
+
+    serveFile(requestPath, response);
+  };
+}
+
+export function createServer(options) {
+  return http.createServer(createRequestHandler(options));
+}
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  createServer().listen(4173, '127.0.0.1', () => {
+    console.log('Local: http://127.0.0.1:4173');
+  });
+}
