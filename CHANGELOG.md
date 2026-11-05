@@ -2,6 +2,12 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.5 — 2026-11-05
+
+- Release prepared: 2026-11-05 22:43:04 UTC.
+- Deployment time: recorded at local server startup and displayed in Help.
+- Updated the release version for the XML import build.
+
 ## 0.1.4 — 2026-11-05
 
 - Release prepared: 2026-11-05 22:39:23 UTC.
