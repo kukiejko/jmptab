@@ -5,6 +5,7 @@ import { createResizableLayout } from './layout-resize.js';
 import { parseXML } from './xml-import.js';
 import { blankWorksheet, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
 import { sortWorksheetRows } from './worksheet-sort.js';
+import { selectRows } from './row-selection.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -55,9 +56,10 @@ function renderSheet() {
   const rows = data.rows.slice(start, start + PAGE_SIZE).map((row, offset) => {
     const index = start + offset;
     const cells = row.map((value, column) =>
-      `<td><input aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
+      `<td><input class="${numeric(value) === null ? 'text-value' : 'numeric-value'}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
     ).join('');
-    return `<tr><td>${(index + 1).toLocaleString('en-US')}</td>${cells}</tr>`;
+    const selected = activeSheet().selectedRows?.has(index) || false;
+    return `<tr data-selected="${selected}"><td class="row-heading"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button></td>${cells}</tr>`;
   }).join('');
   $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col" class="row-number-heading"><label for="enterDirection">#</label><select id="enterDirection" aria-label="Enter direction" title="Enter moves down or right"><option value="down">↓</option><option value="right">→</option></select></th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
   $('enterDirection').value = enterDirection;
@@ -202,7 +204,21 @@ $('tableScroll').addEventListener('scroll', updateHorizontalScroll);
 new ResizeObserver(updateHorizontalScroll).observe($('worksheet'));
 new ResizeObserver(updateHorizontalScroll).observe($('tableScroll'));
 function renderColumns(){for(const id of ['response','predictor']){const prev=$(id).value;$(id).innerHTML=data.headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');if(prev!==''&&Number(prev)<data.headers.length)$(id).value=prev;}if($('predictor').value===$('response').value&&data.headers.length>1)$('predictor').value=String((+$('response').value+1)%data.headers.length);}
-$('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined)data.rows[+el.dataset.row][c]=el.value;else{data.headers[c]=el.value;renderColumns();}dirty();});
+$('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined){data.rows[+el.dataset.row][c]=el.value;el.classList.toggle('numeric-value',numeric(el.value)!==null);el.classList.toggle('text-value',numeric(el.value)===null);}else{data.headers[c]=el.value;renderColumns();}dirty();});
+$('worksheet').addEventListener('click', event => {
+  const button = event.target.closest('[data-select-row]');
+  if (!button) return;
+  const sheet = activeSheet();
+  const result = selectRows(sheet.selectedRows || new Set(), Number(button.dataset.selectRow),
+    sheet.selectionAnchor ?? null, { shift: event.shiftKey, toggle: event.ctrlKey || event.metaKey });
+  sheet.selectedRows = result.selected;
+  sheet.selectionAnchor = result.anchor;
+  for (const row of $('worksheet').querySelectorAll('tbody tr')) {
+    const selected = result.selected.has(Number(row.querySelector('[data-select-row]').dataset.selectRow));
+    row.dataset.selected = String(selected);
+    row.querySelector('[data-select-row]').setAttribute('aria-pressed', String(selected));
+  }
+});
 $('worksheet').addEventListener('change', event => {
   if (event.target.id !== 'enterDirection') return;
   enterDirection = event.target.value;
@@ -215,6 +231,8 @@ $('worksheet').addEventListener('click', event => {
   const direction = activeSheet().sort?.column === column && activeSheet().sort.direction === 'ascending' ? 'descending' : 'ascending';
   data.rows = sortWorksheetRows(data.rows, column, direction);
   activeSheet().sort = { column, direction };
+  activeSheet().selectedRows = new Set();
+  activeSheet().selectionAnchor = null;
   page = 1;
   dirty();
   renderSheet();

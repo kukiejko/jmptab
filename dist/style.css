@@ -105,6 +105,10 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 .table-scroll table { border-collapse: separate; border-spacing: 0; table-layout: fixed; }
 #worksheet th, #worksheet td { padding: 0; border-right: 1px solid #e0e5ec; border-bottom: 1px solid #e0e5ec; overflow: hidden; }
 #worksheet th:first-child, #worksheet td:first-child { text-align: right; padding-right: .55rem; color: var(--muted); background: #f1f4f8; font-variant-numeric: tabular-nums; }
+#worksheet .row-heading { padding: 0; }
+#worksheet .row-heading button { display: block; width: 100%; height: 100%; padding: .31rem .55rem; text-align: right; border-radius: 0; color: inherit; }
+#worksheet tbody tr[data-selected="true"] td, #worksheet tbody tr[data-selected="true"] .row-heading { background: #dceafa; }
+#worksheet tbody tr[data-selected="true"] .row-heading button { color: #164f8e; font-weight: 700; }
 #worksheet thead { position: sticky; top: 0; z-index: 1; background: #edf1f6; }
 #worksheet thead tr:first-child th { position: relative; font-size: .78rem; color: #415875; font-weight: 650; height: 1.48rem; overflow: visible; }
 .row-number-heading { padding-right: .2rem !important; }
@@ -116,6 +120,8 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 #worksheet .column-resize-handle:hover::after, #worksheet .column-resize-handle:focus-visible::after { background: var(--accent); }
 #worksheet thead tr:last-child th { background: #f8fafd; }
 #worksheet input { width: 100%; border: 0; background: transparent; padding: .31rem .5rem; font-variant-numeric: tabular-nums; }
+#worksheet td input.numeric-value { text-align: left; }
+#worksheet td input.text-value { text-align: right; }
 #worksheet thead input { font-weight: 600; }
 #worksheet td:focus-within, #worksheet th:focus-within { background: #e8f2fd; }
 .sheet-tabs { gap: .2rem; min-width: 0; border-top: 1px solid var(--line); background: #edf1f6; padding-left: .25rem; }

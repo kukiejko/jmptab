@@ -20,6 +20,7 @@ Use **+** beside the worksheet tabs to add a blank worksheet. The first, previou
 Double-click a worksheet tab or focus it and press F2 to rename it. Press Enter to save the name or Escape to cancel.
 
 Choose the down or right arrow in the **#** header to control where Enter moves next. The choice is stored in this browser. Click a C1/C2 column header to sort all rows by that column; click again to reverse the order.
+Click a row number to select its entire row. Hold Shift to select a range, or Ctrl/Cmd to add or remove individual rows. Numeric cells align left; text cells align right.
 
 ## Code layout and testing
 
