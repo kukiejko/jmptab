@@ -16,6 +16,8 @@ Use **Open CSV/XML** to import a CSV file or a tabular XML file. Row-based XML u
 
 Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a column's right-edge grip in the C1/C2 header to change its width, or double-click it to fit the widest header or cell value across all rows. Double-click a pane divider to reset it; arrow keys also work when a grip has focus. Dialogs resize from their lower-right corner. Pane and column sizes are stored in this browser.
 
+Use **+** beside the worksheet tabs to add a blank worksheet. The first, previous, next, and last buttons switch between worksheets. The bar below the tabs scrolls wide worksheets horizontally. Save session stores every worksheet and the active tab; Export CSV exports the active worksheet.
+
 ## Code layout and testing
 
 - `dist/stats.js`, `dist/inference.js`, `dist/quality.js`, and `dist/time-series.js` contain browser-independent calculations.
@@ -25,6 +27,7 @@ Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a col
 - `dist/layout-resize.js` owns pane and worksheet column resizing, keyboard controls, and browser-local layout settings.
 - `dist/column-autofit.js` calculates the smallest width from the header and all worksheet rows, independently of the browser.
 - `dist/xml-import.js` maps XML records to worksheet headers and rows. The XML document adapter and record normalization are separate for testing.
+- `dist/workbook.js` creates and validates worksheets. `dist/session.js` stores each worksheet in chunks and reads sessions created before workbook support.
 - `dist/app.js` reads dialog fields and manages worksheet UI and history. Keep calculations and result formatting in the independent modules so they can be tested without a browser.
 - `server.mjs` exports `createRequestHandler` and `createServer`. `tests/server.test.mjs` checks the metadata and static responses without opening a network port.
 
@@ -34,6 +37,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and deployment time semanti
 ## Features
 
 - Editable worksheet with named columns and spreadsheet tab/newline paste
+- Multiple worksheets with tab navigation and horizontal scrolling
 - CSV and XML import for up to 1,000,000 data rows and 30 columns, subject to available browser memory; CSV export
 - Worksheet navigation in 200-row pages. Enter a page number and select Go to jump directly.
 - Descriptive statistics and histogram

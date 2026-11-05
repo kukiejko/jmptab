@@ -2,6 +2,14 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.6 — 2026-11-06
+
+- Release prepared: 2026-11-06 00:15:29 CET.
+- Deployment time: recorded at local server startup and displayed in Help.
+- Added worksheet tabs with first, previous, next, last, and new worksheet controls.
+- Added a persistent horizontal scroll control for wide worksheets.
+- Saved all worksheets and the active tab in local sessions; older saved sessions remain readable.
+
 ## 0.1.5 — 2026-11-05
 
 - Release prepared: 2026-11-05 22:43:04 UTC.

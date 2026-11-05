@@ -10,7 +10,47 @@ function openSessionDatabase() {
   });
 }
 
-export async function saveSession({ data, ...metadata }) {
+export function* sessionEntries({ data, worksheets, activeSheetIndex = 0, ...metadata }) {
+  const sheets = worksheets || [{ name: 'Worksheet 1', data, page: 1 }];
+  yield [-1, {
+    ...metadata,
+    activeSheetIndex,
+    sheets: sheets.map(sheet => ({
+      name: sheet.name, headers: sheet.data.headers,
+      rowCount: sheet.data.rows.length, page: sheet.page || 1
+    }))
+  }];
+  let key = 0;
+  for (const sheet of sheets) {
+    for (let start = 0; start < sheet.data.rows.length; start += CHUNK_SIZE) {
+      yield [key++, sheet.data.rows.slice(start, start + CHUNK_SIZE)];
+    }
+  }
+}
+
+export function decodeSessionRecords(records) {
+  if (!records.length) return null;
+  const { sheets, activeSheetIndex = 0, headers, ...metadata } = records[0];
+  if (Array.isArray(sheets)) {
+    let cursor = 1;
+    const worksheets = sheets.map(sheet => {
+      const rows = [];
+      while (rows.length < sheet.rowCount && cursor < records.length) {
+        rows.push(...records[cursor++]);
+      }
+      if (rows.length !== sheet.rowCount) throw Error('Saved worksheet data is incomplete.');
+      return { name: sheet.name, data: { headers: sheet.headers, rows }, page: sheet.page || 1 };
+    });
+    if (cursor !== records.length) throw Error('Saved worksheet data has extra rows.');
+    return { ...metadata, worksheets, activeSheetIndex };
+  }
+  // Sessions saved before workbook support contain one header record and its row chunks.
+  const rows = [];
+  for (let index = 1; index < records.length; index++) rows.push(...records[index]);
+  return { ...metadata, data: { headers, rows } };
+}
+
+export async function saveSession(session) {
   const database = await openSessionDatabase();
   try {
     await new Promise((resolve, reject) => {
@@ -20,10 +60,7 @@ export async function saveSession({ data, ...metadata }) {
       const store = transaction.objectStore('session');
       try {
         store.clear();
-        store.put({ ...metadata, headers: data.headers }, -1);
-        for (let start = 0; start < data.rows.length; start += CHUNK_SIZE) {
-          store.put(data.rows.slice(start, start + CHUNK_SIZE), start);
-        }
+        for (const [key, value] of sessionEntries(session)) store.put(value, key);
       } catch (error) {
         transaction.abort();
         reject(error);
@@ -42,13 +79,7 @@ export async function loadSession() {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    if (!records.length) return null;
-    const { headers, ...metadata } = records[0];
-    const rows = [];
-    for (let index = 1; index < records.length; index++) {
-      for (const row of records[index]) rows.push(row);
-    }
-    return { ...metadata, data: { headers, rows } };
+    return decodeSessionRecords(records);
   } finally {
     database.close();
   }

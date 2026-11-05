@@ -3,12 +3,16 @@ import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
 import { parseXML } from './xml-import.js';
+import { blankWorksheet, nextWorksheetName, validWorksheet } from './workbook.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
 const names={summary:'Descriptive statistics',histogram:'Histogram',regression:'Linear regression',control:'Individuals control chart','p-chart':'P chart','moving-average':'Moving average','exponential-smoothing':'Single exponential smoothing',capability:'Process capability','one-sample-t':'1-Sample t',correlation:'Correlation','xbar-chart':'Xbar chart'};
 function sample(){return{headers:['Diameter (mm)','Temperature (°C)','Line'],rows:Array.from({length:48},(_,i)=>{const t=20+Math.sin(i*1.7)*2.4+(i%5)*.6;return[(10+.045*(t-21)+Math.sin(i*2.1)*.082+Math.cos(i*.7)*.052).toFixed(3),t.toFixed(2),i%2?'B':'A'];})};}
 let data=sample(),history=[],lastReport='',revision=0,unsaved=false,activeResult=null;const storeKey='statlab-session-v1';
+let worksheets = [{ name: 'Worksheet 1', data, page: 1, scrollLeft: 0 }];
+let activeSheetIndex = 0;
+const activeSheet = () => worksheets[activeSheetIndex];
 function invalidateReport(){lastReport='';$('results').innerHTML='<div class="empty">No result for this worksheet. Choose numeric columns and run an analysis.</div>';$('resultSubtitle').textContent='No analysis yet';}
 function message(text) {
   const outputError = $('error');
@@ -36,6 +40,7 @@ const layout = createResizableLayout({
 function renderSheet() {
   const pageCount = Math.max(1, Math.ceil(data.rows.length / PAGE_SIZE));
   page = Math.min(page, pageCount);
+  activeSheet().page = page;
   const start = (page - 1) * PAGE_SIZE;
   const widths = layout.widthsFor(data.headers.length);
   const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
@@ -61,10 +66,39 @@ function renderSheet() {
   $('previousPage').disabled = page <= 1;
   $('nextPage').disabled = page >= pageCount;
   renderColumns();
+  renderSheetTabs();
+  updateHorizontalScroll();
+}
+
+function renderSheetTabs() {
+  $('worksheetTabs').innerHTML = worksheets.map((sheet, index) =>
+    `<button type="button" data-sheet-index="${index}" aria-current="${index === activeSheetIndex}" aria-label="Open ${esc(sheet.name)}">${esc(sheet.name)}</button>`
+  ).join('');
+  $('firstSheet').disabled = $('previousSheet').disabled = activeSheetIndex === 0;
+  $('lastSheet').disabled = $('nextSheet').disabled = activeSheetIndex === worksheets.length - 1;
+  $('graphBuilderSheetName').textContent = activeSheet().name;
+  const strip = $('worksheetTabs');
+  const selected = strip.querySelector('[aria-current="true"]');
+  const stripRect = strip.getBoundingClientRect();
+  const selectedRect = selected.getBoundingClientRect();
+  if (selectedRect.left < stripRect.left) strip.scrollLeft += selectedRect.left - stripRect.left;
+  else if (selectedRect.right > stripRect.right) strip.scrollLeft += selectedRect.right - stripRect.right;
+}
+
+function updateHorizontalScroll() {
+  const viewport = $('tableScroll');
+  const slider = $('sheetHorizontalScroll');
+  const maximum = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+  slider.max = maximum;
+  slider.value = Math.min(maximum, viewport.scrollLeft);
+  slider.disabled = maximum === 0;
+  $('scrollSheetLeft').disabled = viewport.scrollLeft <= 0;
+  $('scrollSheetRight').disabled = viewport.scrollLeft >= maximum;
 }
 
 function showPage(number) {
   page = Math.max(1, Math.trunc(number) || page);
+  activeSheet().page = page;
   renderSheet();
   document.querySelector('.table-scroll').scrollTop = 0;
 }
@@ -75,6 +109,50 @@ $('goToPage').onclick = () => showPage(Number($('sheetPage').value));
 $('sheetPage').onkeydown = event => {
   if (event.key === 'Enter') $('goToPage').click();
 };
+
+function switchSheet(index) {
+  if (index < 0 || index >= worksheets.length || index === activeSheetIndex) return;
+  activeSheet().page = page;
+  activeSheet().scrollLeft = $('tableScroll').scrollLeft;
+  activeSheetIndex = index;
+  data = activeSheet().data;
+  page = activeSheet().page || 1;
+  renderSheet();
+  $('tableScroll').scrollLeft = activeSheet().scrollLeft || 0;
+  updateHorizontalScroll();
+  const priorResult = history.find(result => result.sheetName === activeSheet().name);
+  if (priorResult) showResult(priorResult);
+  else invalidateReport();
+  unsaved = true;
+  $('saveState').textContent = 'Unsaved changes';
+}
+
+$('worksheetTabs').onclick = event => {
+  const tab = event.target.closest('[data-sheet-index]');
+  if (tab) switchSheet(Number(tab.dataset.sheetIndex));
+};
+$('firstSheet').onclick = () => switchSheet(0);
+$('previousSheet').onclick = () => switchSheet(activeSheetIndex - 1);
+$('nextSheet').onclick = () => switchSheet(activeSheetIndex + 1);
+$('lastSheet').onclick = () => switchSheet(worksheets.length - 1);
+$('addSheet').onclick = () => {
+  if (worksheets.length >= 100) return message('Maximum 100 worksheets per project.');
+  worksheets.push(blankWorksheet(nextWorksheetName(worksheets)));
+  switchSheet(worksheets.length - 1);
+};
+
+$('sheetHorizontalScroll').oninput = event => {
+  $('tableScroll').scrollLeft = Number(event.target.value);
+};
+$('scrollSheetLeft').onclick = () => {
+  $('tableScroll').scrollLeft -= Math.max(100, $('tableScroll').clientWidth * .75);
+};
+$('scrollSheetRight').onclick = () => {
+  $('tableScroll').scrollLeft += Math.max(100, $('tableScroll').clientWidth * .75);
+};
+$('tableScroll').addEventListener('scroll', updateHorizontalScroll);
+new ResizeObserver(updateHorizontalScroll).observe($('worksheet'));
+new ResizeObserver(updateHorizontalScroll).observe($('tableScroll'));
 function renderColumns(){for(const id of ['response','predictor']){const prev=$(id).value;$(id).innerHTML=data.headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');if(prev!==''&&Number(prev)<data.headers.length)$(id).value=prev;}if($('predictor').value===$('response').value&&data.headers.length>1)$('predictor').value=String((+$('response').value+1)%data.headers.length);}
 $('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined)data.rows[+el.dataset.row][c]=el.value;else{data.headers[c]=el.value;renderColumns();}dirty();});
 $('worksheet').addEventListener('paste',e=>{const el=e.target;if(!el.matches('td input'))return;const text=e.clipboardData.getData('text');if(!/[\t\n]/.test(text))return;e.preventDefault();const incoming=text.replace(/\r/g,'').trimEnd().split('\n').map(r=>r.split('\t')),r=+el.dataset.row,c=+el.dataset.col;if(r+incoming.length>MAX_ROWS||c+incoming.reduce((width, row) => Math.max(width, row.length), 0)>30){message('Paste up to 1,000,000 rows and 30 columns.');return;}while(data.headers.length<c+incoming.reduce((width, row) => Math.max(width, row.length), 0))data.headers.push(`Column ${data.headers.length+1}`);data.rows.forEach(row=>{while(row.length<data.headers.length)row.push('');});while(data.rows.length<r+incoming.length)data.rows.push(Array(data.headers.length).fill(''));incoming.forEach((row,i)=>row.forEach((v,j)=>data.rows[r+i][c+j]=v));dirty();renderSheet();});
@@ -144,17 +222,18 @@ function run(record = true) {
     });
     const badge = ['control', 'capability', 'p-chart', 'xbar-chart'].includes(type)
       ? 'Quality analysis' : 'Statistical analysis';
-    const title = `<div class="result-title"><div><h3>${esc(resultColumn)}</h3><p>${esc(names[type])} · Worksheet 1</p></div><span class="badge">${badge}</span></div>`;
+    const title = `<div class="result-title"><div><h3>${esc(resultColumn)}</h3><p>${esc(names[type])} · ${esc(activeSheet().name)}</p></div><span class="badge">${badge}</span></div>`;
     const { html, report } = renderAnalysisResult({
       type, s: result, column, predictorColumn: data.headers[predictorIndex], rowCount: data.rows.length
     });
     const now = new Date();
-    lastReport = `jmptab — ${names[type]}\nColumn: ${resultColumn}\nGenerated: ${now.toISOString()}\nWorksheet revision: ${revision}\n\n${report}`;
+    lastReport = `jmptab — ${names[type]}\nWorksheet: ${activeSheet().name}\nColumn: ${resultColumn}\nGenerated: ${now.toISOString()}\nWorksheet revision: ${revision}\n\n${report}`;
     $('results').innerHTML = title + html;
     $('resultSubtitle').textContent = `${names[type]} · ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     if (record) {
       history.unshift({
-        type, column: resultColumn, time: now.toISOString(), html: title + html, report: lastReport, revision
+        type, column: resultColumn, sheetName: activeSheet().name,
+        time: now.toISOString(), html: title + html, report: lastReport, revision
       });
       history = history.slice(0, 20);
       activeResult = history[0];
@@ -173,7 +252,7 @@ function renderHistory() {
     ? history.map((result, index) => `
         <button class="history-entry" data-history="${index}" aria-current="${result === activeResult}">
           <strong>${esc(result.label || names[result.type])}</strong>
-          <small>${esc(result.column)}</small>
+          <small>${esc(result.column)} · ${esc(result.sheetName || 'Worksheet 1')}</small>
         </button>`).join('')
     : '<p class="empty">Run an analysis to add a result.</p>';
 }
@@ -190,9 +269,13 @@ $('file').onchange = async event => {
     const next = format === 'XML' ? parseXML(await file.text()) : parseCSV(await file.text());
     if (unsaved && !confirm(`Replace your unsaved worksheet with this ${format}? Export or save first to keep your work.`)) return;
     data = next;
+    activeSheet().data = next;
+    activeSheet().page = 1;
+    activeSheet().scrollLeft = 0;
     page = 1;
-    history = [];
-    revision = 0;
+    history = history.filter(result => result.sheetName !== activeSheet().name);
+    activeResult = null;
+    revision++;
     unsaved = true;
     invalidateReport();
     renderSheet();
@@ -206,21 +289,44 @@ $('file').onchange = async event => {
     $('file').value = '';
   }
 };
-$('sampleBtn').onclick=()=>{if(unsaved&&!confirm('Replace your worksheet with sample data? Export or save first to keep your work.'))return;data=sample();page=1;history=[];revision=0;unsaved=true;invalidateReport();renderSheet();renderHistory();$('analysis').value='summary';$('response').value='0';$('predictor').value='1';updateSettings();$('projectName').textContent='Sample process study';$('saveState').textContent='Unsaved changes';run();};
+$('sampleBtn').onclick = () => {
+  if (unsaved && !confirm('Replace your worksheet with sample data? Export or save first to keep your work.')) return;
+  data = sample();
+  activeSheet().data = data;
+  activeSheet().page = 1;
+  activeSheet().scrollLeft = 0;
+  page = 1;
+  history = history.filter(result => result.sheetName !== activeSheet().name);
+  activeResult = null;
+  revision++;
+  unsaved = true;
+  invalidateReport();
+  renderSheet();
+  renderHistory();
+  $('analysis').value = 'summary';
+  $('response').value = '0';
+  $('predictor').value = '1';
+  updateSettings();
+  $('projectName').textContent = 'Sample process study';
+  $('saveState').textContent = 'Unsaved changes';
+  run();
+};
 $('saveBtn').onclick = async () => {
   const button = $('saveBtn');
   if (button.disabled) return;
   button.disabled = true;
   const savedData = data;
   const savedRevision = revision;
+  const savedSheetIndex = activeSheetIndex;
   try {
     await saveSession({
-      data,
+      worksheets,
+      activeSheetIndex,
       revision,
       name: $('projectName').textContent,
       settings: { ...Object.fromEntries(analysisFields.map(id => [id, $(id).value])), tTest: $('tTest').checked }
     });
-    if (data === savedData && revision === savedRevision) {
+    if (data === savedData && revision === savedRevision && activeSheetIndex === savedSheetIndex) {
       unsaved = false;
       $('saveState').textContent = 'Saved on this device';
     }
@@ -370,11 +476,12 @@ $('helpBtn').onclick = async () => {
 };
 $('closeHelp').onclick = () => $('help').close();
 function addGraphResult(graph) {
-  const html = `<div class="result-title"><div><h3>${esc(graph.title)}</h3><p>${esc(graph.label)} · Worksheet 1</p></div>
+  const html = `<div class="result-title"><div><h3>${esc(graph.title)}</h3><p>${esc(graph.label)} · ${esc(activeSheet().name)}</p></div>
     <button data-export-graph>Export SVG</button></div>
     <div class="graph-result-figure">${graph.svg}<p class="muted">${esc(graph.note)}</p></div>`;
-  const report = ['jmptab — ' + graph.label, graph.title, graph.note, 'Worksheet revision: ' + revision].join('\n');
-  history.unshift({ type: graph.type, label: graph.label, column: graph.column, html, report, revision });
+  const report = ['jmptab — ' + graph.label, 'Worksheet: ' + activeSheet().name, graph.title, graph.note, 'Worksheet revision: ' + revision].join('\n');
+  history.unshift({ type: graph.type, label: graph.label, column: graph.column,
+    sheetName: activeSheet().name, html, report, revision });
   history = history.slice(0, 20);
   showResult(history[0]);
   renderHistory();
@@ -421,16 +528,21 @@ async function restoreWorkspace() {
   if (!saved) {
     try { saved = JSON.parse(localStorage.getItem(storeKey)); } catch { /* Start with sample data. */ }
   }
-  if (saved?.data?.headers?.length && saved.data.headers.length <= MAX_COLUMNS &&
-      Array.isArray(saved.data.rows) && saved.data.rows.length <= MAX_ROWS &&
-      saved.data.rows.every(row => Array.isArray(row) && row.length === saved.data.headers.length)) {
-    data = saved.data;
+  const restoredSheets = Array.isArray(saved?.worksheets) ? saved.worksheets :
+    saved?.data ? [{ name: 'Worksheet 1', data: saved.data, page: 1 }] : null;
+  let restored = false;
+  if (restoredSheets?.length && restoredSheets.length <= 100 && restoredSheets.every(validWorksheet)) {
+    worksheets = restoredSheets;
+    activeSheetIndex = Math.max(0, Math.min(worksheets.length - 1, Number(saved.activeSheetIndex) || 0));
+    data = activeSheet().data;
+    page = activeSheet().page || 1;
     revision = saved.revision || 0;
     $('projectName').textContent = saved.name || 'Process study';
     $('saveState').textContent = 'Restored from this device';
+    restored = true;
   }
   renderSheet();
-  if (data === saved?.data) {
+  if (restored) {
     for (const id of analysisFields) {
       if (saved.settings?.[id] !== undefined) $(id).value = saved.settings[id];
     }
