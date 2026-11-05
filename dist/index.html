@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="mtab statistical analysis workspace">
+  <title>mtab · Statistical Workbench</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="graph-builder.css">
+</head>
+<body>
+  <svg class="symbols" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <symbol id="i-open" viewBox="0 0 20 20"><path d="M2.5 15.5v-11h5l2 2h7v3m-14 6 3-6h12l-2.5 6z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 20 20"><path d="M4 3h10l2 2v12H4zm3 0v5h6V3m0 14v-5H7v5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="12" rx="1"/><path d="M3 8h14M3 12h14M8 4v12m4-12v12"/></symbol>
+    <symbol id="i-bars" viewBox="0 0 20 20"><path d="M3 3v14h14M6 14v-4m4 4V6m4 8V9"/></symbol>
+    <symbol id="i-run" viewBox="0 0 20 20"><path d="m7 4 9 6-9 6z" fill="currentColor" stroke="none"/></symbol>
+  </svg>
+  <header class="chrome">
+    <div class="titlebar">
+      <span class="brand"><svg><use href="#i-bars"/></svg>mtab</span>
+      <span class="title-divider"></span>
+      <strong id="projectName">Process study</strong>
+      <span class="title-label">Statistical Workbench</span>
+    </div>
+    <nav class="menubar" aria-label="Application menu">
+      <details><summary>File</summary><div class="menu"><button data-action="importBtn">Open CSV…</button><button data-action="saveBtn">Save session</button><button data-action="exportBtn">Export worksheet…</button><button data-action="reportBtn">Export report…</button></div></details>
+      <details><summary>Data</summary><div class="menu"><button data-action="addRow">Insert row</button><button data-action="addCol">Insert column</button><button data-action="sampleBtn">Load sample data</button></div></details>
+      <details><summary>Stat</summary><div class="menu"><button data-analysis="summary">Descriptive statistics…</button><button data-analysis="regression">Linear regression…</button><button data-analysis="control">Individuals control chart…</button><button data-analysis="capability">Process capability…</button></div></details>
+      <details><summary>Graph</summary><div class="menu"><button id="graphMenuBtn">Graph Builder…</button><button id="histogramMenuBtn">Histogram…</button></div></details>
+      <details><summary>View</summary><div class="menu"><button data-action="toggleNavigator">Toggle Navigator</button><button data-action="focusOutput">Focus Output Pane</button><button data-action="focusSheet">Focus worksheet</button></div></details>
+      <details><summary>Help</summary><div class="menu"><button id="helpBtn">Methods &amp; help</button></div></details>
+    </nav>
+    <div class="toolbar" aria-label="Quick commands">
+      <button id="importBtn"><svg><use href="#i-open"/></svg>Open CSV</button>
+      <button id="saveBtn"><svg><use href="#i-save"/></svg>Save</button>
+      <span class="tool-divider"></span>
+      <button id="sampleBtn"><svg><use href="#i-grid"/></svg>Sample data</button>
+      <button id="configureBtn" class="run-tool"><svg><use href="#i-run"/></svg>Run analysis</button>
+      <button id="graphBuilderBtn"><svg><use href="#i-bars"/></svg>Graph Builder</button>
+      <input id="file" type="file" accept=".csv,text/csv" hidden>
+    </div>
+  </header>
+
+  <main class="workbench">
+    <aside class="navigator" id="navigator" aria-labelledby="navigatorTitle">
+      <div class="pane-heading"><h2 id="navigatorTitle">Navigator</h2><button id="clearHistory" title="Clear session results">Clear</button></div>
+      <div class="tree-label"><svg><use href="#i-bars"/></svg> Session results <span id="historyCount">0</span></div>
+      <div id="historyList"></div>
+    </aside>
+    <div class="panes">
+      <section class="results-panel" aria-labelledby="outputTitle">
+        <div class="pane-heading">
+          <h2 id="outputTitle" tabindex="-1">Output Pane</h2>
+          <span id="resultSubtitle"></span>
+          <button id="reportBtn">Export report</button>
+        </div>
+        <div id="error" class="error" role="alert" hidden></div>
+        <div class="output-scroll" id="outputScroll"><div id="results" aria-live="polite"></div></div>
+      </section>
+      <section class="sheet-panel" aria-labelledby="sheetTitle">
+        <div class="pane-heading">
+          <h2 id="sheetTitle">Worksheet</h2>
+          <span id="sheetCount"></span>
+          <button id="addCol">+ Column</button>
+          <button id="addRow">+ Row</button>
+          <button id="exportBtn">Export CSV</button>
+        </div>
+        <div class="table-scroll"><table id="worksheet" aria-label="Editable data worksheet"></table></div>
+        <div class="sheet-tabs">
+          <span><svg><use href="#i-grid"/></svg> Worksheet 1</span>
+          <div class="sheet-pagination" aria-label="Worksheet pagination">
+            <button id="previousPage" aria-label="Previous worksheet page">‹</button>
+            <label for="sheetPage">Page</label>
+            <input id="sheetPage" type="number" min="1" step="1" value="1">
+            <span id="pageCount"></span>
+            <button id="goToPage">Go</button>
+            <button id="nextPage" aria-label="Next worksheet page">›</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="statusbar">
+    <span><i></i> <span id="saveState" role="status">Local workspace</span></span>
+    <span>Data stays on this device</span>
+  </footer>
+
+  <dialog id="analysisDialog" aria-labelledby="analysisTitle">
+    <div class="dialog-heading"><h2 id="analysisTitle">Run analysis</h2><button id="closeAnalysis" aria-label="Close analysis dialog">×</button></div>
+    <section class="analysis-bar" aria-label="Analysis settings"><div class="field analysis-field"><label for="analysis">Analysis</label><select id="analysis"><option value="summary">Descriptive statistics</option><option value="histogram">Histogram</option><option value="regression">Linear regression</option><option value="control">Individuals control chart</option><option value="capability">Process capability</option></select></div><div class="field"><label for="response">Response column</label><select id="response"></select></div><div class="field" id="predictorField" hidden><label for="predictor">Predictor column</label><select id="predictor"></select></div><div class="field spec" hidden><label for="lsl">Lower spec</label><input id="lsl" type="number" step="any" value="9.5"></div><div class="field spec" hidden><label for="usl">Upper spec</label><input id="usl" type="number" step="any" value="10.5"></div></section>
+    <p id="analysisError" class="error" role="alert" hidden></p>
+    <div class="dialog-actions"><button id="cancelAnalysis">Cancel</button><button id="runBtn" class="primary">Run</button></div>
+  </dialog>
+  <dialog id="help"><div class="dialog-heading"><h2>Methods & help</h2><button id="closeHelp" aria-label="Close help">Close</button></div><p>Import a CSV with a header row, or edit the sample worksheet. Choose an analysis and a numeric response column, then run it. Results are snapshots; run again after editing.</p><h3>Statistical methods</h3><p>Descriptive statistics use the sample standard deviation (n − 1) and linearly interpolated quantiles. Regression is ordinary least squares with an intercept; missing pairs are excluded.</p><p>Individuals charts use mean ± 3σ, where σ = average consecutive moving range / 1.128. Only points outside these limits are flagged. Observation order is preserved; missing values must be resolved first.</p><p>Capability uses this within-process σ for Cp/Cpk and sample standard deviation for Pp/Ppk. Normality, process stability, and representative sampling must be assessed separately; no normality test is included.</p><p><a href="https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc322.htm" target="_blank" rel="noreferrer">NIST: Individuals control charts ↗</a><br><a href="https://www.itl.nist.gov/div898/handbook/ppc/section4/ppc46.htm" target="_blank" rel="noreferrer">NIST: Process capability ↗</a></p><p class="muted">Save session stores your worksheet and settings in this browser. No account or server upload is used. This independent app is not affiliated with Minitab.</p></dialog>
+  <dialog id="graphBuilder" class="graph-builder" aria-labelledby="graphBuilderTitle">
+    <header class="gb-titlebar">
+      <svg aria-hidden="true"><use href="#i-bars"/></svg>
+      <h2 id="graphBuilderTitle">Graph Builder</h2>
+      <span>Worksheet 1</span>
+      <button id="closeGraphBuilder" aria-label="Close Graph Builder">×</button>
+    </header>
+    <div class="gb-layout">
+      <aside class="gb-columns" aria-labelledby="gbColumnsTitle">
+        <h3 id="gbColumnsTitle">Columns</h3>
+        <div class="gb-column-list" id="gbColumns"></div>
+        <p>Drag a column to a field or select it from the list.</p>
+      </aside>
+      <section class="gb-source" aria-labelledby="gbSourceTitle">
+        <h3 id="gbSourceTitle">Source data</h3>
+        <div class="gb-fields">
+          <div class="gb-field" id="gbVariableField">
+            <label for="gbVariable">Variable / Y</label>
+            <select id="gbVariable"></select>
+          </div>
+          <div id="gbHistogramSource" class="gb-histogram-fields" hidden>
+            <label for="gbContinuous">Continuous variables</label>
+            <select id="gbContinuous" multiple size="4"></select>
+            <small>Use Ctrl or Command to select multiple columns.</small>
+            <label for="gbHistogramLayout">Layout</label>
+            <select id="gbHistogramLayout"><option value="separate">Separate graphs</option><option value="overlay">Overlay continuous variables</option></select>
+            <label for="gbGroup">Group variable</label>
+            <select id="gbGroup"></select>
+            <label for="gbBy">By variables</label>
+            <select id="gbBy" multiple size="4"></select>
+            <label class="gb-check"><input type="checkbox" id="gbCombinations" disabled> Show all combinations</label>
+          </div>
+          <div class="gb-field" id="gbXField">
+            <label for="gbX">X variable</label>
+            <select id="gbX"></select>
+          </div>
+        </div>
+        <h3>Graph options</h3>
+        <div class="gb-fields">
+          <label for="gbTitle">Title</label>
+          <input id="gbTitle" type="text" placeholder="Automatic title" maxlength="120">
+          <div class="gb-field" id="gbBinsField" hidden>
+            <label for="gbBins">Number of bins</label>
+            <select id="gbBins"><option value="0">Automatic</option><option>5</option><option>10</option><option>15</option><option>20</option><option>30</option></select>
+          </div>
+          <div id="gbHistogramScale" class="gb-histogram-fields" hidden>
+            <label for="gbYScale">Y-scale</label>
+            <select id="gbYScale"><option value="frequency">Frequency</option><option value="percent">Percent</option></select>
+            <label class="gb-check"><input type="checkbox" id="gbSameY" checked> Same Y-scale</label>
+            <label class="gb-check"><input type="checkbox" id="gbSameX"> Same X-scale</label>
+          </div>
+          <label id="gbFitField" class="gb-check" hidden><input id="gbFit" type="checkbox"> Show fitted line</label>
+        </div>
+      </section>
+      <section class="gb-preview" aria-label="Graph preview">
+        <nav class="gb-candidates" id="gbCandidates" aria-label="Graph candidates"></nav>
+        <div class="gb-canvas-header">
+          <strong id="gbCanvasTitle">Gallery</strong>
+          <label id="gbFilterLabel">Show <select id="gbFilter"><option value="all">All graphs</option><option value="one">One variable</option><option value="two">Two variables</option></select></label>
+        </div>
+        <div class="gb-canvas" id="gbCanvas" aria-live="polite"></div>
+      </section>
+    </div>
+    <footer class="gb-footer">
+      <button id="gbReset">Reset</button>
+      <span id="gbStatus" role="status">Select a graph to continue.</span>
+      <button id="gbCancel">Cancel</button>
+      <button id="gbApply" class="gb-apply" disabled>Create graph</button>
+    </footer>
+  </dialog>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
