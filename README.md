@@ -1,4 +1,4 @@
-# mtab
+# jmptab
 
 A working, independent statistical analysis application inspired by the workflow of Minitab. Not affiliated with Minitab and not a complete replacement for its statistical suite.
 
@@ -18,15 +18,21 @@ Open http://127.0.0.1:4173. Use Stat or Graph to open an analysis dialog, then s
 - CSV import and export for up to 1,000,000 data rows and 30 columns, subject to available browser memory
 - Worksheet navigation in 200-row pages. Enter a page number and select Go to jump directly.
 - Descriptive statistics and histogram
+- One-sample t confidence intervals and hypothesis tests from a worksheet column or summary statistics
+- Pearson correlation with complete-pair exclusion and a scatterplot
 - Simple linear regression with fit chart and R-squared
 - Individuals control chart using consecutive moving ranges
+- P chart for defective counts with fixed subgroup size and an optional target proportion
+- Xbar chart for consecutive equal-sized subgroups, with estimated or known process standard deviation
 - Capability Cp/Cpk and overall performance Pp/Ppk
+- Moving-average time-series forecast with fitted values and mean absolute error
+- Single exponential smoothing with configurable weight and starting average
 - Result history, text report download, and browser-local worksheet/settings save
 
 Data is processed in the browser. Analysis uses every eligible row. Large regression and process charts display up to 800 points, and large report exports summarize results. Use Export CSV for the full dataset. Saving uses local browser database storage. Result history lasts until reload, while saved sessions restore the worksheet and settings.
 
 ## Methods and limits
 
-Standard deviation uses n − 1. Quantiles use linear interpolation at (n − 1)p. Regression excludes missing/non-numeric pairs and uses ordinary least squares with an intercept. Individuals control limits use mean ± 3 × MR-bar / 1.128. Only the outside-limit rule is checked. Control/capability analyses reject missing and nonnumeric observations to preserve sequence order. Capability uses MR-based within sigma for Cp/Cpk and sample standard deviation for Pp/Ppk. It does not test normality or stability. No inferential tests, ANOVA, DOE, subgroup charts, or multivariable models are included in this initial scope.
+Standard deviation uses n − 1. Quantiles use linear interpolation at (n − 1)p. Regression excludes missing/non-numeric pairs and uses ordinary least squares with an intercept. Pearson correlation uses the same complete pairs and a two-sided t test for its p-value. Individuals control limits use mean ± 3 × MR-bar / 1.128. Only the outside-limit rule is checked. Control/capability analyses reject missing and nonnumeric observations to preserve sequence order. P charts require whole-number defective counts and a fixed subgroup size; 3-sigma limits are clipped to 0 and 1. Xbar charts use consecutive complete subgroups and an estimated sigma from subgroup standard deviations corrected by c4, unless a known sigma is entered. Capability uses MR-based within sigma for Cp/Cpk and sample standard deviation for Pp/Ppk. It does not test normality or stability. Moving averages use preceding observations for each fitted value and the latest span for the next-period forecast. Single exponential smoothing uses an average of the first k observations as its initial value, with each subsequent smoothed value based on the selected weight. ANOVA, DOE, variable-subgroup charts, and multivariable models remain outside this scope.
 
 References: https://www.itl.nist.gov/div898/handbook/pmc/section3/pmc322.htm and https://www.itl.nist.gov/div898/handbook/ppc/section4/ppc46.htm.

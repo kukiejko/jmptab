@@ -6,7 +6,7 @@ function openSessionDatabase() {
     request.onupgradeneeded = () => request.result.createObjectStore('session');
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('Close other mtab tabs and retry.'));
+    request.onblocked = () => reject(new Error('Close other jmptab tabs and retry.'));
   });
 }
 

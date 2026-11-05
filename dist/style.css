@@ -107,7 +107,7 @@ svg:not(.chart) { width: 1.25rem; height: 1.25rem; flex: none; fill: none; strok
 .sheet-pagination button:disabled { opacity: .4; cursor: default; background: transparent; }
 .statusbar { justify-content: space-between; background: #245389; color: white; padding: .32rem .75rem; font-size: .83rem; }
 .statusbar i { display: inline-block; width: .45rem; height: .45rem; margin-right: .25rem; border-radius: 50%; background: #badfd6; }
-dialog { width: min(35rem, calc(100% - 2rem)); padding: 0; border: 1px solid #aab9cc; border-radius: 5px; box-shadow: 0 10px 35px #243a6340; color: inherit; }
+dialog { width: min(35rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto; padding: 0; border: 1px solid #aab9cc; border-radius: 5px; box-shadow: 0 10px 35px #243a6340; color: inherit; }
 dialog::backdrop { background: #21354d52; }
 .dialog-heading, .dialog-actions { display: flex; align-items: center; gap: .55rem; padding: .65rem .9rem; background: #eef2f7; }
 .dialog-heading { border-bottom: 1px solid var(--line); justify-content: space-between; }
