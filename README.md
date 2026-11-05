@@ -12,7 +12,7 @@ npm start
 
 Open http://127.0.0.1:4173. Use Stat or Graph to open an analysis dialog, then select a result in the Navigator to revisit it. Run `npm test` for calculation and CSV tests.
 
-Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a column's right-edge grip in the C1/C2 header to change its width. Double-click a grip to reset it, or focus it and use arrow keys. Dialogs resize from their lower-right corner. Pane and column sizes are stored in this browser.
+Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a column's right-edge grip in the C1/C2 header to change its width, or double-click it to fit the widest header or cell value across all rows. Double-click a pane divider to reset it; arrow keys also work when a grip has focus. Dialogs resize from their lower-right corner. Pane and column sizes are stored in this browser.
 
 ## Code layout and testing
 
@@ -21,6 +21,7 @@ Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a col
 - `dist/analysis-rendering.js` turns calculation results into chart HTML and export text. Its entry point is also browser independent.
 - `dist/chart.js` draws SVG charts, while `dist/result-format.js` provides shared HTML escaping and number formatting.
 - `dist/layout-resize.js` owns pane and worksheet column resizing, keyboard controls, and browser-local layout settings.
+- `dist/column-autofit.js` calculates the smallest width from the header and all worksheet rows, independently of the browser.
 - `dist/app.js` reads dialog fields and manages worksheet UI and history. Keep calculations and result formatting in the independent modules so they can be tested without a browser.
 - `server.mjs` exports `createRequestHandler` and `createServer`. `tests/server.test.mjs` checks the metadata and static responses without opening a network port.
 

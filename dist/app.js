@@ -28,7 +28,8 @@ const layout = createResizableLayout({
   panes: document.querySelector('.panes'),
   paneHandle: $('paneResizer'),
   table: $('worksheet'),
-  tableScroll: document.querySelector('.table-scroll')
+  tableScroll: document.querySelector('.table-scroll'),
+  getWorksheet: () => data
 });
 
 function renderSheet() {
@@ -38,7 +39,7 @@ function renderSheet() {
   const widths = layout.widthsFor(data.headers.length);
   const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
   const headers = data.headers.map((_, index) =>
-    `<th scope="col">C${index + 1}<button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="800" title="Drag to resize column; double-click to reset"></button></th>`
+    `<th scope="col">C${index + 1}<button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
   ).join('');
   const names = data.headers.map((name, column) =>
     `<th><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`

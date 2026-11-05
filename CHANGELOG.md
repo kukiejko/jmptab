@@ -2,6 +2,12 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.3 — 2026-11-05
+
+- Release prepared: 2026-11-05 13:47:33 UTC.
+- Deployment time: recorded at local server startup and displayed in Help.
+- Double-click a worksheet column resize grip to fit the widest header or cell, including rows on later pages.
+
 ## 0.1.2 — 2026-11-05
 
 - Release prepared: 2026-11-05 13:24:42 UTC.

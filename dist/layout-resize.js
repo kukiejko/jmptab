@@ -1,8 +1,14 @@
+import { fittedColumnWidth } from './column-autofit.js';
+
 const STORAGE_KEY = 'jmptab-layout-v1';
 const MIN_COLUMN_WIDTH = 96;
-const MAX_COLUMN_WIDTH = 800;
+const MAX_COLUMN_WIDTH = 16384;
 const ROW_NUMBER_WIDTH = 72;
 const SPLITTER_WIDTH = 8;
+
+function measurementFont(style) {
+  return `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+}
 
 export function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
@@ -67,7 +73,7 @@ function attachSplitter({ handle, container, axis, limits, getSize, setSize, res
   });
 }
 
-export function createResizableLayout({ workbench, navigator, navHandle, panes, paneHandle, table, tableScroll }) {
+export function createResizableLayout({ workbench, navigator, navHandle, panes, paneHandle, table, tableScroll, getWorksheet }) {
   const storage = createStorage();
   let columnWidths = Array.isArray(storage.get('columnWidths'))
     ? storage.get('columnWidths').filter(width => Number.isFinite(width) && width >= MIN_COLUMN_WIDTH && width <= MAX_COLUMN_WIDTH)
@@ -135,6 +141,29 @@ export function createResizableLayout({ workbench, navigator, navHandle, panes, 
     if (persist) storage.set('columnWidths', columnWidths);
   }
 
+  function autoFitColumn(index) {
+    const worksheet = getWorksheet();
+    const headerInput = table.querySelector(`thead input[data-col="${index}"]`);
+    const cellInput = table.querySelector(`tbody input[data-col="${index}"]`);
+    const headerStyle = getComputedStyle(headerInput);
+    const cellStyle = getComputedStyle(cellInput || headerInput);
+    const context = document.createElement('canvas').getContext('2d');
+    context.font = measurementFont(headerStyle);
+    const headerWidth = context.measureText(worksheet.headers[index]).width;
+    context.font = measurementFont(cellStyle);
+    const padding = Math.max(
+      parseFloat(headerStyle.paddingLeft) + parseFloat(headerStyle.paddingRight),
+      parseFloat(cellStyle.paddingLeft) + parseFloat(cellStyle.paddingRight)
+    ) + 4;
+    const width = fittedColumnWidth({
+      header: worksheet.headers[index], rows: worksheet.rows, columnIndex: index,
+      measureHeader: () => headerWidth,
+      measureCell: value => context.measureText(String(value)).width,
+      padding, minimum: MIN_COLUMN_WIDTH
+    });
+    setColumnWidth(index, width);
+  }
+
   let columnDrag = null;
   table.addEventListener('pointerdown', event => {
     const handle = event.target.closest('[data-resize-column]');
@@ -174,7 +203,7 @@ export function createResizableLayout({ workbench, navigator, navHandle, panes, 
   });
   table.addEventListener('dblclick', event => {
     const handle = event.target.closest('[data-resize-column]');
-    if (handle) setColumnWidth(Number(handle.dataset.resizeColumn), defaultColumnWidth(columnWidths.length));
+    if (handle) autoFitColumn(Number(handle.dataset.resizeColumn));
   });
 
   const savedNavWidth = storage.get('navigatorWidth');
