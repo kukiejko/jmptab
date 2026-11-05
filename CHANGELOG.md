@@ -2,6 +2,13 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.9 — 2026-11-06
+
+- Release prepared: 2026-11-06 00:35:44 CET.
+- Deployment time: recorded at local server startup and displayed in Help.
+- Moved the Enter direction selector into the row-number header.
+- Added ascending and descending whole-row sorting from column headers.
+
 ## 0.1.8 — 2026-11-06
 
 - Release prepared: 2026-11-06 00:32:24 CET.

@@ -4,6 +4,7 @@ import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.j
 import { createResizableLayout } from './layout-resize.js';
 import { parseXML } from './xml-import.js';
 import { blankWorksheet, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
+import { sortWorksheetRows } from './worksheet-sort.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -12,6 +13,7 @@ function sample(){return{headers:['Diameter (mm)','Temperature (°C)','Line'],ro
 let data=sample(),history=[],lastReport='',revision=0,unsaved=false,activeResult=null;const storeKey='statlab-session-v1';
 let worksheets = [{ name: 'Worksheet 1', data, page: 1, scrollLeft: 0 }];
 let activeSheetIndex = 0;
+let enterDirection = (() => { try { return localStorage.getItem('jmptab-enter-direction') === 'right' ? 'right' : 'down'; } catch { return 'down'; } })();
 const activeSheet = () => worksheets[activeSheetIndex];
 function invalidateReport(){lastReport='';$('results').innerHTML='<div class="empty">No result for this worksheet. Choose numeric columns and run an analysis.</div>';$('resultSubtitle').textContent='No analysis yet';}
 function message(text) {
@@ -45,7 +47,7 @@ function renderSheet() {
   const widths = layout.widthsFor(data.headers.length);
   const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
   const headers = data.headers.map((_, index) =>
-    `<th scope="col">C${index + 1}<button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
+    `<th scope="col" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Sort by ${esc(data.headers[index])}">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
   ).join('');
   const names = data.headers.map((name, column) =>
     `<th><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`
@@ -57,7 +59,8 @@ function renderSheet() {
     ).join('');
     return `<tr><td>${(index + 1).toLocaleString('en-US')}</td>${cells}</tr>`;
   }).join('');
-  $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col">#</th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
+  $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col" class="row-number-heading"><label for="enterDirection">#</label><select id="enterDirection" aria-label="Enter direction" title="Enter moves down or right"><option value="down">↓</option><option value="right">→</option></select></th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
+  $('enterDirection').value = enterDirection;
   layout.applyColumnWidths();
   $('sheetCount').textContent = `${data.rows.length.toLocaleString('en-US')} rows · ${data.headers.length} columns`;
   $('sheetPage').value = page;
@@ -200,15 +203,29 @@ new ResizeObserver(updateHorizontalScroll).observe($('worksheet'));
 new ResizeObserver(updateHorizontalScroll).observe($('tableScroll'));
 function renderColumns(){for(const id of ['response','predictor']){const prev=$(id).value;$(id).innerHTML=data.headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');if(prev!==''&&Number(prev)<data.headers.length)$(id).value=prev;}if($('predictor').value===$('response').value&&data.headers.length>1)$('predictor').value=String((+$('response').value+1)%data.headers.length);}
 $('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined)data.rows[+el.dataset.row][c]=el.value;else{data.headers[c]=el.value;renderColumns();}dirty();});
-$('enterDirection').value = (() => { try { return localStorage.getItem('jmptab-enter-direction') === 'right' ? 'right' : 'down'; } catch { return 'down'; } })();
-$('enterDirection').onchange = () => { try { localStorage.setItem('jmptab-enter-direction', $('enterDirection').value); } catch { /* Keep the current selection. */ } };
+$('worksheet').addEventListener('change', event => {
+  if (event.target.id !== 'enterDirection') return;
+  enterDirection = event.target.value;
+  try { localStorage.setItem('jmptab-enter-direction', enterDirection); } catch { /* Keep the current selection. */ }
+});
+$('worksheet').addEventListener('click', event => {
+  const button = event.target.closest('[data-sort-column]');
+  if (!button) return;
+  const column = Number(button.dataset.sortColumn);
+  const direction = activeSheet().sort?.column === column && activeSheet().sort.direction === 'ascending' ? 'descending' : 'ascending';
+  data.rows = sortWorksheetRows(data.rows, column, direction);
+  activeSheet().sort = { column, direction };
+  page = 1;
+  dirty();
+  renderSheet();
+});
 $('worksheet').addEventListener('keydown', event => {
   const cell = event.target;
   if (event.key !== 'Enter' || event.isComposing || !cell.matches('td input')) return;
   event.preventDefault();
   let row = Number(cell.dataset.row);
   let column = Number(cell.dataset.col);
-  if ($('enterDirection').value === 'right') {
+  if (enterDirection === 'right') {
     if (++column >= data.headers.length) { column = 0; row++; }
   } else row++;
   if (row >= MAX_ROWS) return;
