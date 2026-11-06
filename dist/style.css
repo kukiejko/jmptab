@@ -106,7 +106,9 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 #worksheet th, #worksheet td { padding: 0; border-right: 1px solid #e0e5ec; border-bottom: 1px solid #e0e5ec; overflow: hidden; }
 #worksheet th:first-child, #worksheet td:first-child { text-align: right; padding-right: .55rem; color: var(--muted); background: #f1f4f8; font-variant-numeric: tabular-nums; }
 #worksheet .row-heading { padding: 0; }
-#worksheet .row-heading button { display: block; width: 100%; height: 100%; padding: .31rem .55rem; text-align: right; border-radius: 0; color: inherit; }
+#worksheet .row-heading-content { display: flex; align-items: stretch; }
+#worksheet .row-heading button { flex: 1; min-width: 0; padding: .31rem .2rem; text-align: right; border-radius: 0; color: inherit; }
+#worksheet .row-heading select { width: 1.45rem; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .8rem; }
 #worksheet tbody tr[data-selected="true"] td, #worksheet tbody tr[data-selected="true"] .row-heading { background: #dceafa; }
 #worksheet tbody tr[data-selected="true"] .row-heading button { color: #164f8e; font-weight: 700; }
 #worksheet thead { position: sticky; top: 0; z-index: 1; background: #edf1f6; }
@@ -114,11 +116,16 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 .row-number-heading { padding-right: .2rem !important; }
 .row-number-heading label { margin-right: .25rem; }
 .row-number-heading select { width: 1.65rem; padding: 0; border: 1px solid var(--line); background: white; font-size: .9rem; }
-#worksheet .sort-column { width: 100%; height: 100%; padding: 0 .5rem; border-radius: 0; font-weight: 650; color: inherit; }
+#worksheet .column-top { display: flex; align-items: stretch; height: 100%; }
+#worksheet .sort-column { flex: 1; min-width: 0; height: 100%; padding: 0 .15rem; border-radius: 0; font-weight: 650; color: inherit; }
+#worksheet .column-top select { flex: none; width: 1.5rem; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .8rem; }
 #worksheet .column-resize-handle { position: absolute; right: -5px; top: 0; z-index: 2; width: 11px; height: 100%; padding: 0; cursor: col-resize; touch-action: none; }
 #worksheet .column-resize-handle::after { content: ''; display: block; width: 2px; height: 65%; margin: auto; background: #9aaec5; border-radius: 2px; }
 #worksheet .column-resize-handle:hover::after, #worksheet .column-resize-handle:focus-visible::after { background: var(--accent); }
 #worksheet thead tr:last-child th { background: #f8fafd; }
+.column-meta { display: flex; align-items: stretch; min-width: 0; }
+.column-meta input { flex: 1; min-width: 0; }
+.column-meta select { flex: none; width: 4.3rem; border: 0; border-left: 1px solid var(--line); background: #edf3fa; color: #245389; font-size: .78rem; }
 #worksheet input { width: 100%; border: 0; background: transparent; padding: .31rem .5rem; font-variant-numeric: tabular-nums; }
 #worksheet td input.numeric-value { text-align: left; }
 #worksheet td input.text-value { text-align: right; }

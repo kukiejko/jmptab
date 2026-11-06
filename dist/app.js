@@ -3,9 +3,10 @@ import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
 import { parseXML } from './xml-import.js';
-import { blankWorksheet, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
+import { blankWorksheet, COLUMN_ROLES, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
 import { sortWorksheetRows } from './worksheet-sort.js';
 import { selectRows } from './row-selection.js';
+import { insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -48,18 +49,21 @@ function renderSheet() {
   const widths = layout.widthsFor(data.headers.length);
   const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
   const headers = data.headers.map((_, index) =>
-    `<th scope="col" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Sort by ${esc(data.headers[index])}">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
+    `<th scope="col" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><div class="column-top"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Sort by ${esc(data.headers[index])}">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><select data-column-action="${index}" aria-label="Column ${index + 1} actions" title="Insert or move column"><option value="">⋯</option><option value="insert-left">Insert left</option><option value="insert-right">Insert right</option><option value="move-left">Move left</option><option value="move-right">Move right</option></select></div><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
   ).join('');
-  const names = data.headers.map((name, column) =>
-    `<th><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`
-  ).join('');
+  const names = data.headers.map((name, column) => {
+    const selected = data.roles?.[column] || '';
+    const options = `<option value="">Role</option>` + COLUMN_ROLES.map(role =>
+      `<option value="${role}"${selected === role ? ' selected' : ''}>${role}</option>`).join('');
+    return `<th><div class="column-meta"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"><select data-column-role="${column}" aria-label="Role for column ${column + 1}">${options}</select></div></th>`;
+  }).join('');
   const rows = data.rows.slice(start, start + PAGE_SIZE).map((row, offset) => {
     const index = start + offset;
     const cells = row.map((value, column) =>
       `<td><input class="${numeric(value) === null ? 'text-value' : 'numeric-value'}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
     ).join('');
     const selected = activeSheet().selectedRows?.has(index) || false;
-    return `<tr data-selected="${selected}"><td class="row-heading"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button></td>${cells}</tr>`;
+    return `<tr data-selected="${selected}"><td class="row-heading"><div class="row-heading-content"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button><select data-row-action="${index}" aria-label="Row ${index + 1} actions" title="Insert row"><option value="">⋯</option><option value="above">Insert above</option><option value="below">Insert below</option></select></div></td>${cells}</tr>`;
   }).join('');
   $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col" class="row-number-heading"><label for="enterDirection">#</label><select id="enterDirection" aria-label="Enter direction" title="Enter moves down or right"><option value="down">↓</option><option value="right">→</option></select></th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
   $('enterDirection').value = enterDirection;
@@ -220,6 +224,38 @@ $('worksheet').addEventListener('click', event => {
   }
 });
 $('worksheet').addEventListener('change', event => {
+  if (event.target.matches('[data-column-action]')) {
+    const index = Number(event.target.dataset.columnAction);
+    const action = event.target.value;
+    try {
+      if (action === 'insert-left') insertColumn(data, index);
+      else if (action === 'insert-right') insertColumn(data, index + 1);
+      else if (action === 'move-left' && !moveColumn(data, index, index - 1)) { event.target.value = ''; return; }
+      else if (action === 'move-right' && !moveColumn(data, index, index + 1)) { event.target.value = ''; return; }
+      else return;
+      activeSheet().sort = null;
+      dirty();
+      renderSheet();
+    } catch (error) { message(error.message); event.target.value = ''; }
+    return;
+  }
+  if (event.target.matches('[data-row-action]')) {
+    const index = Number(event.target.dataset.rowAction);
+    try {
+      insertRow(data, index + (event.target.value === 'below' ? 1 : 0));
+      activeSheet().selectedRows = new Set();
+      activeSheet().selectionAnchor = null;
+      dirty();
+      renderSheet();
+    } catch (error) { message(error.message); event.target.value = ''; }
+    return;
+  }
+  if (event.target.matches('[data-column-role]')) {
+    data.roles ||= Array(data.headers.length).fill('');
+    data.roles[Number(event.target.dataset.columnRole)] = event.target.value;
+    dirty();
+    return;
+  }
   if (event.target.id !== 'enterDirection') return;
   enterDirection = event.target.value;
   try { localStorage.setItem('jmptab-enter-direction', enterDirection); } catch { /* Keep the current selection. */ }
@@ -257,7 +293,7 @@ $('worksheet').addEventListener('keydown', event => {
   }
   $('worksheet').querySelector(`td input[data-row="${row}"][data-col="${column}"]`)?.focus();
 });
-$('worksheet').addEventListener('paste',e=>{const el=e.target;if(!el.matches('td input'))return;const text=e.clipboardData.getData('text');if(!/[\t\n]/.test(text))return;e.preventDefault();const incoming=text.replace(/\r/g,'').trimEnd().split('\n').map(r=>r.split('\t')),r=+el.dataset.row,c=+el.dataset.col;if(r+incoming.length>MAX_ROWS||c+incoming.reduce((width, row) => Math.max(width, row.length), 0)>30){message('Paste up to 1,000,000 rows and 30 columns.');return;}while(data.headers.length<c+incoming.reduce((width, row) => Math.max(width, row.length), 0))data.headers.push(`Column ${data.headers.length+1}`);data.rows.forEach(row=>{while(row.length<data.headers.length)row.push('');});while(data.rows.length<r+incoming.length)data.rows.push(Array(data.headers.length).fill(''));incoming.forEach((row,i)=>row.forEach((v,j)=>data.rows[r+i][c+j]=v));dirty();renderSheet();});
+$('worksheet').addEventListener('paste',e=>{const el=e.target;if(!el.matches('td input'))return;const text=e.clipboardData.getData('text');if(!/[\t\n]/.test(text))return;e.preventDefault();const incoming=text.replace(/\r/g,'').trimEnd().split('\n').map(r=>r.split('\t')),r=+el.dataset.row,c=+el.dataset.col;if(r+incoming.length>MAX_ROWS||c+incoming.reduce((width, row) => Math.max(width, row.length), 0)>30){message('Paste up to 1,000,000 rows and 30 columns.');return;}while(data.headers.length<c+incoming.reduce((width, row) => Math.max(width, row.length), 0))data.headers.push(`Column ${data.headers.length+1}`);if(data.roles)while(data.roles.length<data.headers.length)data.roles.push('');data.rows.forEach(row=>{while(row.length<data.headers.length)row.push('');});while(data.rows.length<r+incoming.length)data.rows.push(Array(data.headers.length).fill(''));incoming.forEach((row,i)=>row.forEach((v,j)=>data.rows[r+i][c+j]=v));dirty();renderSheet();});
 function updateSettings(){const type=$('analysis').value;$('predictorField').hidden=type!=='regression'&&type!=='correlation';document.querySelectorAll('.spec').forEach(el=>el.hidden=type!=='capability');$('pFields').hidden=type!=='p-chart';$('xbarFields').hidden=type!=='xbar-chart';$('maFields').hidden=type!=='moving-average';$('esFields').hidden=type!=='exponential-smoothing';$('tFields').hidden=type!=='one-sample-t';$('responseField').hidden=type==='one-sample-t'&&$('tSource').value==='summary';$('tSummaryFields').hidden=$('tSource').value!=='summary';$('tNullField').hidden=!$('tTest').checked;}
 $('analysis').onchange=updateSettings;
 $('tSource').onchange=updateSettings;
@@ -359,7 +395,7 @@ function renderHistory() {
     : '<p class="empty">Run an analysis to add a result.</p>';
 }
 
-$('addRow').onclick=()=>{if(data.rows.length>=MAX_ROWS)return message('Maximum 1,000,000 rows.');data.rows.push(Array(data.headers.length).fill(''));dirty();showPage(Math.ceil(data.rows.length / PAGE_SIZE));const scroll=document.querySelector('.table-scroll');scroll.scrollTop=scroll.scrollHeight;};$('addCol').onclick=()=>{if(data.headers.length>=30)return message('Maximum 30 columns.');data.headers.push(`Column ${data.headers.length+1}`);data.rows.forEach(r=>r.push(''));dirty();renderSheet();};
+$('addRow').onclick=()=>{if(data.rows.length>=MAX_ROWS)return message('Maximum 1,000,000 rows.');data.rows.push(Array(data.headers.length).fill(''));dirty();showPage(Math.ceil(data.rows.length / PAGE_SIZE));const scroll=document.querySelector('.table-scroll');scroll.scrollTop=scroll.scrollHeight;};$('addCol').onclick=()=>{if(data.headers.length>=30)return message('Maximum 30 columns.');data.headers.push(`Column ${data.headers.length+1}`);data.roles?.push('');data.rows.forEach(r=>r.push(''));dirty();renderSheet();};
 function download(name,content,type){const url=URL.createObjectURL(new Blob(typeof content === "string" ? [content] : content,{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('exportBtn').onclick=()=>download('worksheet.csv',csvChunks(data),'text/csv;charset=utf-8');$('reportBtn').onclick=()=>lastReport?download('jmptab-report.txt',lastReport,'text/plain;charset=utf-8'):message('Run an analysis before exporting a report.');
 $('importBtn').onclick = () => $('file').click();

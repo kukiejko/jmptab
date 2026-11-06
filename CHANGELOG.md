@@ -2,6 +2,13 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.11 — 2026-11-06
+
+- Release prepared: 2026-11-06 01:03:00 CET.
+- Deployment time: recorded at local server startup and displayed in Help.
+- Added per-column role labels X1, X2, Y1–Y3, and Z1–Z3, saved with each worksheet.
+- Added column insertion and left/right movement, plus row insertion above or below a chosen row.
+
 ## 0.1.10 — 2026-11-06
 
 - Release prepared: 2026-11-06 00:57:27 CET.

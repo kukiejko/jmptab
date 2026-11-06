@@ -151,8 +151,9 @@ export function createResizableLayout({ workbench, navigator, navHandle, panes, 
     context.font = measurementFont(headerStyle);
     const headerWidth = context.measureText(worksheet.headers[index]).width;
     context.font = measurementFont(cellStyle);
+    const roleWidth = table.querySelector(`thead select[data-column-role="${index}"]`)?.offsetWidth || 0;
     const padding = Math.max(
-      parseFloat(headerStyle.paddingLeft) + parseFloat(headerStyle.paddingRight),
+      parseFloat(headerStyle.paddingLeft) + parseFloat(headerStyle.paddingRight) + roleWidth,
       parseFloat(cellStyle.paddingLeft) + parseFloat(cellStyle.paddingRight)
     ) + 4;
     const width = fittedColumnWidth({

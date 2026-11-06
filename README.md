@@ -21,6 +21,8 @@ Double-click a worksheet tab or focus it and press F2 to rename it. Press Enter 
 
 Choose the down or right arrow in the **#** header to control where Enter moves next. The choice is stored in this browser. Click a C1/C2 column header to sort all rows by that column; click again to reverse the order.
 Click a row number to select its entire row. Hold Shift to select a range, or Ctrl/Cmd to add or remove individual rows. Numeric cells align left; text cells align right.
+Use the role selector beside each column name to label it X1, X2, Y1, Y2, Y3, Z1, Z2, or Z3. Roles are stored with each worksheet and do not alter its cell values.
+Use the menu in a column header to insert a column on either side or move it left or right. The menu beside a row number inserts a row above or below it. **+ Column** and **+ Row** still append at the end.
 
 ## Code layout and testing
 

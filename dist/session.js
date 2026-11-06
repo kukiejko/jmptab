@@ -16,7 +16,7 @@ export function* sessionEntries({ data, worksheets, activeSheetIndex = 0, ...met
     ...metadata,
     activeSheetIndex,
     sheets: sheets.map(sheet => ({
-      name: sheet.name, headers: sheet.data.headers,
+      name: sheet.name, headers: sheet.data.headers, roles: sheet.data.roles,
       rowCount: sheet.data.rows.length, page: sheet.page || 1
     }))
   }];
@@ -39,7 +39,7 @@ export function decodeSessionRecords(records) {
         rows.push(...records[cursor++]);
       }
       if (rows.length !== sheet.rowCount) throw Error('Saved worksheet data is incomplete.');
-      return { name: sheet.name, data: { headers: sheet.headers, rows }, page: sheet.page || 1 };
+      return { name: sheet.name, data: { headers: sheet.headers, ...(sheet.roles ? { roles: sheet.roles } : {}), rows }, page: sheet.page || 1 };
     });
     if (cursor !== records.length) throw Error('Saved worksheet data has extra rows.');
     return { ...metadata, worksheets, activeSheetIndex };

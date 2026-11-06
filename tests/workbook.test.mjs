@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { blankWorksheet, nextWorksheetName, renameWorksheet, validWorksheet } from '../dist/workbook.js';
+import { blankWorksheet, COLUMN_ROLES, nextWorksheetName, renameWorksheet, validWorksheet } from '../dist/workbook.js';
 import { decodeSessionRecords, sessionEntries } from '../dist/session.js';
 
 test('new worksheets have independent blank cells and unique names', () => {
@@ -19,6 +19,16 @@ test('worksheet names are trimmed, unique, and kept in saved data', () => {
   assert.equal(worksheets[0].name, 'Process data');
   assert.throws(() => renameWorksheet(worksheets, 1, 'process data'), /already/);
   assert.throws(() => renameWorksheet(worksheets, 1, '  '), /1 to 50/);
+});
+
+test('column roles use the requested labels and survive session serialization', () => {
+  assert.deepEqual(COLUMN_ROLES, ['X1', 'X2', 'Y1', 'Y2', 'Y3', 'Z1', 'Z2', 'Z3']);
+  const sheet = blankWorksheet('Worksheet 1');
+  sheet.data.roles[0] = 'X1';
+  sheet.data.roles[1] = 'Y2';
+  const records = [...sessionEntries({ worksheets: [sheet] })].map(([, value]) => value);
+  assert.deepEqual(decodeSessionRecords(records).worksheets[0].data.roles.slice(0, 2), ['X1', 'Y2']);
+  assert.ok(validWorksheet(sheet));
 });
 
 test('saved workbook restores every sheet, active tab, and page', () => {
