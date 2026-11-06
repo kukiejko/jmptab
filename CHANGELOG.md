@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.15 — 2026-11-06
+
+- Moved column role selection from the worksheet header row to the right-click menu on C1/C2 headers. The menu shows the current role and supports clearing it.
+
 ## 0.1.14 — 2026-11-06
 
 - Right-clicking a column header opens Copy column, Sort ascending, and Sort descending. Copy includes the column name and all rows.

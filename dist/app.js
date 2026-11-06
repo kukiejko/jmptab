@@ -51,12 +51,9 @@ function renderSheet() {
   const headers = data.headers.map((_, index) =>
     `<th scope="col" data-column-index="${index}" data-selected-column="${activeSheet().selectedColumn === index}" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><div class="column-top"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Select column ${index + 1}; Shift-click to sort" aria-pressed="${activeSheet().selectedColumn === index}" title="Click to select column; Shift-click to sort">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><select data-column-action="${index}" aria-label="Column ${index + 1} actions" title="Insert or move column"><option value="">⋯</option><option value="insert-left">Insert left</option><option value="insert-right">Insert right</option><option value="move-left">Move left</option><option value="move-right">Move right</option></select></div><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
   ).join('');
-  const names = data.headers.map((name, column) => {
-    const selected = data.roles?.[column] || '';
-    const options = `<option value="">Role</option>` + COLUMN_ROLES.map(role =>
-      `<option value="${role}"${selected === role ? ' selected' : ''}>${role}</option>`).join('');
-    return `<th data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><div class="column-meta"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"><select data-column-role="${column}" aria-label="Role for column ${column + 1}">${options}</select></div></th>`;
-  }).join('');
+  const names = data.headers.map((name, column) =>
+    `<th data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`
+  ).join('');
   const rows = data.rows.slice(start, start + PAGE_SIZE).map((row, offset) => {
     const index = start + offset;
     const cells = row.map((value, column) =>
@@ -226,15 +223,24 @@ function sortColumn(column, direction) {
 }
 function openSheetMenu(kind, index, x, y) {
   const actions = kind === 'column-context'
-    ? [['copy', 'Copy column'], ['sort-ascending', 'Sort ascending'], ['sort-descending', 'Sort descending']]
+    ? [['copy', 'Copy column'], ['sort-ascending', 'Sort ascending'], ['sort-descending', 'Sort descending'],
+      ['role-', 'Role: none'], ...COLUMN_ROLES.map(role => [`role-${role}`, `Role: ${role}`])]
     : kind === 'column'
     ? [['insert-left', 'Insert column left'], ['insert-right', 'Insert column right'], ['move-left', 'Move column left'], ['move-right', 'Move column right']]
     : [['above', 'Insert row above'], ['below', 'Insert row below']];
   sheetMenu.replaceChildren(...actions.map(([value, label]) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.setAttribute('role', 'menuitem');
-    button.textContent = label;
+    if (value.startsWith('role-')) {
+      const selected = (data.roles?.[index] || '') === value.slice(5);
+      button.setAttribute('role', 'menuitemradio');
+      button.setAttribute('aria-checked', String(selected));
+      button.textContent = `${selected ? '✓ ' : ''}${label}`;
+      if (value === 'role-') button.className = 'menu-section-start';
+    } else {
+      button.setAttribute('role', 'menuitem');
+      button.textContent = label;
+    }
     button.onclick = async () => {
       closeSheetMenu();
       if (kind === 'column-context') {
@@ -243,6 +249,10 @@ function openSheetMenu(kind, index, x, y) {
             await navigator.clipboard.writeText(columnClipboardText(data, index));
             message(`Copied column C${index + 1}.`);
           } catch { message('Clipboard access was denied. Allow clipboard access and try again.'); }
+        } else if (value.startsWith('role-')) {
+          data.roles ||= Array(data.headers.length).fill('');
+          data.roles[index] = value.slice(5);
+          dirty();
         } else sortColumn(index, value === 'sort-ascending' ? 'ascending' : 'descending');
         return;
       }
@@ -317,12 +327,6 @@ $('worksheet').addEventListener('change', event => {
       dirty();
       renderSheet();
     } catch (error) { message(error.message); event.target.value = ''; }
-    return;
-  }
-  if (event.target.matches('[data-column-role]')) {
-    data.roles ||= Array(data.headers.length).fill('');
-    data.roles[Number(event.target.dataset.columnRole)] = event.target.value;
-    dirty();
     return;
   }
   if (event.target.id !== 'enterDirection') return;
