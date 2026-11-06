@@ -1,6 +1,7 @@
 import { MAX_COLUMNS, MAX_ROWS } from './stats.js';
 
-export const COLUMN_ROLES = ['X1', 'X2', 'Y1', 'Y2', 'Y3', 'Z1', 'Z2', 'Z3'];
+export const COLUMN_ROLE_GROUPS = { X: ['X1', 'X2'], Y: ['Y1', 'Y2', 'Y3'], Z: ['Z1', 'Z2', 'Z3'], G: ['G'] };
+export const COLUMN_ROLES = Object.values(COLUMN_ROLE_GROUPS).flat();
 
 export function nextWorksheetName(worksheets) {
   const used = new Set(worksheets.map(sheet => sheet.name));

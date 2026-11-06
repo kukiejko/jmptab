@@ -16,6 +16,13 @@ export function moveColumn(data, from, to) {
   return true;
 }
 
+export function deleteColumn(data, index) {
+  if (data.headers.length <= 1) throw Error('A worksheet must have at least one column.');
+  data.headers.splice(index, 1);
+  data.roles?.splice(index, 1);
+  for (const row of data.rows) row.splice(index, 1);
+}
+
 export function insertRow(data, index) {
   if (data.rows.length >= MAX_ROWS) throw Error('Maximum 1,000,000 rows.');
   data.rows.splice(index, 0, Array(data.headers.length).fill(''));

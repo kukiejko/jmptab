@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.17 — 2026-11-06
+
+- Removed the inline column action menu. Right-click a C1/C2 header to insert, move, or delete a column; role choices are grouped in X, Y, Z, and G submenus.
+
 ## 0.1.16 — 2026-11-06
 
 - Removed the inline row action menu. Right-click a selected row number to insert a row above or below or delete the selected row(s).

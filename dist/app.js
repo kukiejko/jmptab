@@ -3,10 +3,10 @@ import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
 import { parseXML } from './xml-import.js';
-import { blankWorksheet, COLUMN_ROLES, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
+import { blankWorksheet, COLUMN_ROLE_GROUPS, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
 import { sortWorksheetRows } from './worksheet-sort.js';
 import { selectRows } from './row-selection.js';
-import { columnClipboardText, deleteRows, insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
+import { columnClipboardText, deleteColumn, deleteRows, insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -49,7 +49,7 @@ function renderSheet() {
   const widths = layout.widthsFor(data.headers.length);
   const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
   const headers = data.headers.map((_, index) =>
-    `<th scope="col" data-column-index="${index}" data-selected-column="${activeSheet().selectedColumn === index}" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><div class="column-top"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Select column ${index + 1}; Shift-click to sort" aria-pressed="${activeSheet().selectedColumn === index}" title="Click to select column; Shift-click to sort">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><select data-column-action="${index}" aria-label="Column ${index + 1} actions" title="Insert or move column"><option value="">⋯</option><option value="insert-left">Insert left</option><option value="insert-right">Insert right</option><option value="move-left">Move left</option><option value="move-right">Move right</option></select></div><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
+    `<th scope="col" data-column-index="${index}" data-selected-column="${activeSheet().selectedColumn === index}" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Select column ${index + 1}; Shift-click to sort" aria-pressed="${activeSheet().selectedColumn === index}" title="Click to select column; Shift-click to sort; right-click for actions">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
   ).join('');
   const names = data.headers.map((name, column) =>
     `<th data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`
@@ -211,6 +211,12 @@ sheetMenu.className = 'sheet-context-menu';
 sheetMenu.setAttribute('role', 'menu');
 sheetMenu.hidden = true;
 document.body.append(sheetMenu);
+sheetMenu.addEventListener('click', event => {
+  if (!event.target.matches('summary')) return;
+  requestAnimationFrame(() => {
+    if (!sheetMenu.hidden) sheetMenu.style.top = `${Math.max(8, Math.min(parseFloat(sheetMenu.style.top), innerHeight - sheetMenu.offsetHeight - 8))}px`;
+  });
+});
 function closeSheetMenu() { sheetMenu.hidden = true; sheetMenu.replaceChildren(); }
 function sortColumn(column, direction) {
   data.rows = sortWorksheetRows(data.rows, column, direction);
@@ -221,52 +227,87 @@ function sortColumn(column, direction) {
   dirty();
   renderSheet();
 }
+function changeColumn(index, action) {
+  try {
+    if (action === 'insert-left') insertColumn(data, index);
+    else if (action === 'insert-right') insertColumn(data, index + 1);
+    else if (action === 'delete') deleteColumn(data, index);
+    else if (action === 'move-left' && !moveColumn(data, index, index - 1)) return;
+    else if (action === 'move-right' && !moveColumn(data, index, index + 1)) return;
+    activeSheet().sort = null;
+    activeSheet().selectedColumn = null;
+    dirty();
+    renderSheet();
+  } catch (error) { message(error.message); }
+}
+function menuButton(label, action, role = 'menuitem') {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.setAttribute('role', role);
+  button.textContent = label;
+  button.onclick = action;
+  return button;
+}
 function openSheetMenu(kind, index, x, y) {
-  const actions = kind === 'column-context'
-    ? [['copy', 'Copy column'], ['sort-ascending', 'Sort ascending'], ['sort-descending', 'Sort descending'],
-      ['role-', 'Role: none'], ...COLUMN_ROLES.map(role => [`role-${role}`, `Role: ${role}`])]
-    : [['above', 'Insert row above'], ['below', 'Insert row below'],
-      ['delete', activeSheet().selectedRows?.size > 1 ? 'Delete selected rows' : 'Delete row']];
-  sheetMenu.replaceChildren(...actions.map(([value, label]) => {
-    const button = document.createElement('button');
-    button.type = 'button';
-    if (value.startsWith('role-')) {
-      const selected = (data.roles?.[index] || '') === value.slice(5);
-      button.setAttribute('role', 'menuitemradio');
-      button.setAttribute('aria-checked', String(selected));
-      button.textContent = `${selected ? '✓ ' : ''}${label}`;
-      if (value === 'role-') button.className = 'menu-section-start';
-    } else {
-      button.setAttribute('role', 'menuitem');
-      button.textContent = label;
-    }
-    button.onclick = async () => {
+  const buttons = [];
+  if (kind === 'column-context') {
+    buttons.push(menuButton('Copy column', async () => {
       closeSheetMenu();
-      if (kind === 'column-context') {
-        if (value === 'copy') {
-          try {
-            await navigator.clipboard.writeText(columnClipboardText(data, index));
-            message(`Copied column C${index + 1}.`);
-          } catch { message('Clipboard access was denied. Allow clipboard access and try again.'); }
-        } else if (value.startsWith('role-')) {
-          data.roles ||= Array(data.headers.length).fill('');
-          data.roles[index] = value.slice(5);
-          dirty();
-        } else sortColumn(index, value === 'sort-ascending' ? 'ascending' : 'descending');
-        return;
-      }
       try {
-        if (value === 'delete') deleteRows(data, activeSheet().selectedRows || [index]);
-        else insertRow(data, index + (value === 'below' ? 1 : 0));
-        activeSheet().selectedRows = new Set();
-        activeSheet().selectionAnchor = null;
-        activeSheet().sort = null;
+        await navigator.clipboard.writeText(columnClipboardText(data, index));
+        message(`Copied column C${index + 1}.`);
+      } catch { message('Clipboard access was denied. Allow clipboard access and try again.'); }
+    }));
+    for (const [action, label] of [['sort-ascending', 'Sort ascending'], ['sort-descending', 'Sort descending']]) {
+      buttons.push(menuButton(label, () => { closeSheetMenu(); sortColumn(index, action === 'sort-ascending' ? 'ascending' : 'descending'); }));
+    }
+    for (const [action, label] of [['insert-left', 'Insert column left'], ['insert-right', 'Insert column right'],
+      ['move-left', 'Move column left'], ['move-right', 'Move column right'], ['delete', 'Delete column']]) {
+      buttons.push(menuButton(label, () => { closeSheetMenu(); changeColumn(index, action); }));
+    }
+    const roleMenu = document.createElement('details');
+    roleMenu.className = 'menu-section-start';
+    const roleSummary = document.createElement('summary');
+    roleSummary.textContent = `Role: ${data.roles?.[index] || 'none'}`;
+    roleMenu.append(roleSummary);
+    const roleChoice = (role, label) => {
+      const selected = (data.roles?.[index] || '') === role;
+      const button = menuButton(`${selected ? '✓ ' : ''}${label}`, () => {
+        closeSheetMenu();
+        data.roles ||= Array(data.headers.length).fill('');
+        data.roles[index] = role;
         dirty();
-        renderSheet();
-      } catch (error) { message(error.message); }
+      }, 'menuitemradio');
+      button.setAttribute('aria-checked', String(selected));
+      return button;
     };
-    return button;
-  }));
+    roleMenu.append(roleChoice('', 'None'));
+    for (const [group, roles] of Object.entries(COLUMN_ROLE_GROUPS)) {
+      const groupMenu = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = group === 'G' ? 'G (group)' : group;
+      groupMenu.append(summary, ...roles.map(role => roleChoice(role, role === 'G' ? 'G (group)' : role)));
+      roleMenu.append(groupMenu);
+    }
+    buttons.push(roleMenu);
+  } else {
+    for (const [action, label] of [['above', 'Insert row above'], ['below', 'Insert row below'],
+      ['delete', activeSheet().selectedRows?.size > 1 ? 'Delete selected rows' : 'Delete row']]) {
+      buttons.push(menuButton(label, () => {
+        closeSheetMenu();
+        try {
+          if (action === 'delete') deleteRows(data, activeSheet().selectedRows || [index]);
+          else insertRow(data, index + (action === 'below' ? 1 : 0));
+          activeSheet().selectedRows = new Set();
+          activeSheet().selectionAnchor = null;
+          activeSheet().sort = null;
+          dirty();
+          renderSheet();
+        } catch (error) { message(error.message); }
+      }));
+    }
+  }
+  sheetMenu.replaceChildren(...buttons);
   sheetMenu.hidden = false;
   sheetMenu.style.left = `${Math.max(0, Math.min(x, innerWidth - sheetMenu.offsetWidth - 8))}px`;
   sheetMenu.style.top = `${Math.max(0, Math.min(y, innerHeight - sheetMenu.offsetHeight - 8))}px`;
@@ -311,22 +352,6 @@ $('worksheet').addEventListener('click', event => {
   }
 });
 $('worksheet').addEventListener('change', event => {
-  if (event.target.matches('[data-column-action]')) {
-    const index = Number(event.target.dataset.columnAction);
-    const action = event.target.value;
-    try {
-      if (action === 'insert-left') insertColumn(data, index);
-      else if (action === 'insert-right') insertColumn(data, index + 1);
-      else if (action === 'move-left' && !moveColumn(data, index, index - 1)) { event.target.value = ''; return; }
-      else if (action === 'move-right' && !moveColumn(data, index, index + 1)) { event.target.value = ''; return; }
-      else return;
-      activeSheet().sort = null;
-      activeSheet().selectedColumn = null;
-      dirty();
-      renderSheet();
-    } catch (error) { message(error.message); event.target.value = ''; }
-    return;
-  }
   if (event.target.id !== 'enterDirection') return;
   enterDirection = event.target.value;
   try { localStorage.setItem('jmptab-enter-direction', enterDirection); } catch { /* Keep the current selection. */ }

@@ -116,14 +116,19 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 .row-number-heading { padding-right: .2rem !important; }
 .row-number-heading label { margin-right: .25rem; }
 .row-number-heading select { width: 1.65rem; padding: 0; border: 1px solid var(--line); background: white; font-size: .9rem; }
-#worksheet .column-top { display: flex; align-items: stretch; height: 100%; }
-#worksheet .sort-column { flex: 1; min-width: 0; height: 100%; padding: 0 .15rem; border-radius: 0; font-weight: 650; color: inherit; }
-#worksheet .column-top select { flex: none; width: 1.5rem; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .8rem; }
+#worksheet .sort-column { width: 100%; height: 100%; padding: 0 .5rem; border-radius: 0; font-weight: 650; color: inherit; }
 .sheet-context-menu { position: fixed; z-index: 100; min-width: 11rem; max-height: calc(100vh - 16px); overflow-y: auto; padding: .25rem; border: 1px solid var(--line); background: white; box-shadow: 0 6px 18px #18375a33; }
 .sheet-context-menu[hidden] { display: none; }
 .sheet-context-menu button { display: block; width: 100%; padding: .4rem .6rem; text-align: left; color: #183a65; }
 .sheet-context-menu button:hover, .sheet-context-menu button:focus-visible { background: #e8f2fd; }
-.sheet-context-menu .menu-section-start { border-top: 1px solid var(--line); margin-top: .2rem; padding-top: .6rem; }
+.sheet-context-menu .menu-section-start { border-top: 1px solid var(--line); margin-top: .2rem; padding-top: .2rem; }
+.sheet-context-menu summary { list-style: none; cursor: pointer; padding: .4rem .6rem; color: #183a65; }
+.sheet-context-menu summary::-webkit-details-marker { display: none; }
+.sheet-context-menu summary::after { content: ' ▸'; float: right; }
+.sheet-context-menu details[open] > summary::after { content: ' ▾'; }
+.sheet-context-menu details details { margin-left: .6rem; border-left: 1px solid var(--line); }
+.sheet-context-menu details button { padding-left: 1rem; }
+.sheet-context-menu summary:hover, .sheet-context-menu summary:focus-visible { background: #e8f2fd; }
 #worksheet .column-resize-handle { position: absolute; right: -5px; top: 0; z-index: 2; width: 11px; height: 100%; padding: 0; cursor: col-resize; touch-action: none; }
 #worksheet .column-resize-handle::after { content: ''; display: block; width: 2px; height: 65%; margin: auto; background: #9aaec5; border-radius: 2px; }
 #worksheet .column-resize-handle:hover::after, #worksheet .column-resize-handle:focus-visible::after { background: var(--accent); }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { columnClipboardText, deleteRows, insertColumn, insertRow, moveColumn } from '../dist/worksheet-structure.js';
+import { columnClipboardText, deleteColumn, deleteRows, insertColumn, insertRow, moveColumn } from '../dist/worksheet-structure.js';
 
 test('column insertion and movement keep headers, roles, and row values together', () => {
   const data = { headers: ['A', 'B'], roles: ['X1', 'Y1'], rows: [['1', '2'], ['3', '4']] };
@@ -17,6 +17,13 @@ test('row insertion adds a complete blank row at the chosen position', () => {
   const data = { headers: ['A', 'B'], rows: [['1', '2'], ['3', '4']] };
   insertRow(data, 1);
   assert.deepEqual(data.rows, [['1', '2'], ['', ''], ['3', '4']]);
+});
+
+test('deleting a column removes its name, role, and values but keeps one column', () => {
+  const data = { headers: ['A', 'B'], roles: ['X1', 'G'], rows: [['1', '2'], ['3', '4']] };
+  deleteColumn(data, 0);
+  assert.deepEqual(data, { headers: ['B'], roles: ['G'], rows: [['2'], ['4']] });
+  assert.throws(() => deleteColumn(data, 0), /at least one column/);
 });
 
 test('deleting selected rows preserves the order of complete remaining rows', () => {
