@@ -6,7 +6,7 @@ import { parseXML } from './xml-import.js';
 import { blankWorksheet, COLUMN_ROLES, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
 import { sortWorksheetRows } from './worksheet-sort.js';
 import { selectRows } from './row-selection.js';
-import { insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
+import { columnClipboardText, insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -215,8 +215,19 @@ sheetMenu.setAttribute('role', 'menu');
 sheetMenu.hidden = true;
 document.body.append(sheetMenu);
 function closeSheetMenu() { sheetMenu.hidden = true; sheetMenu.replaceChildren(); }
+function sortColumn(column, direction) {
+  data.rows = sortWorksheetRows(data.rows, column, direction);
+  activeSheet().sort = { column, direction };
+  activeSheet().selectedRows = new Set();
+  activeSheet().selectionAnchor = null;
+  page = 1;
+  dirty();
+  renderSheet();
+}
 function openSheetMenu(kind, index, x, y) {
-  const actions = kind === 'column'
+  const actions = kind === 'column-context'
+    ? [['copy', 'Copy column'], ['sort-ascending', 'Sort ascending'], ['sort-descending', 'Sort descending']]
+    : kind === 'column'
     ? [['insert-left', 'Insert column left'], ['insert-right', 'Insert column right'], ['move-left', 'Move column left'], ['move-right', 'Move column right']]
     : [['above', 'Insert row above'], ['below', 'Insert row below']];
   sheetMenu.replaceChildren(...actions.map(([value, label]) => {
@@ -224,8 +235,17 @@ function openSheetMenu(kind, index, x, y) {
     button.type = 'button';
     button.setAttribute('role', 'menuitem');
     button.textContent = label;
-    button.onclick = () => {
+    button.onclick = async () => {
       closeSheetMenu();
+      if (kind === 'column-context') {
+        if (value === 'copy') {
+          try {
+            await navigator.clipboard.writeText(columnClipboardText(data, index));
+            message(`Copied column C${index + 1}.`);
+          } catch { message('Clipboard access was denied. Allow clipboard access and try again.'); }
+        } else sortColumn(index, value === 'sort-ascending' ? 'ascending' : 'descending');
+        return;
+      }
       const select = $('worksheet').querySelector(`[data-${kind}-action="${index}"]`);
       if (!select) return;
       select.value = value;
@@ -246,6 +266,12 @@ $('worksheet').addEventListener('click', event => {
   event.stopPropagation();
   openSheetMenu('row', Number(row.dataset.selectRow), event.clientX, event.clientY);
 }, true);
+$('worksheet').addEventListener('contextmenu', event => {
+  const header = event.target.closest('thead tr:first-child th[data-column-index]');
+  if (!header) return;
+  event.preventDefault();
+  openSheetMenu('column-context', Number(header.dataset.columnIndex), event.clientX, event.clientY);
+});
 document.addEventListener('pointerdown', event => { if (!sheetMenu.hidden && !sheetMenu.contains(event.target)) closeSheetMenu(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !sheetMenu.hidden) { closeSheetMenu(); event.preventDefault(); } });
 $('worksheet').addEventListener('click', event => {
@@ -322,13 +348,7 @@ $('worksheet').addEventListener('click', event => {
     return;
   }
   const direction = activeSheet().sort?.column === column && activeSheet().sort.direction === 'ascending' ? 'descending' : 'ascending';
-  data.rows = sortWorksheetRows(data.rows, column, direction);
-  activeSheet().sort = { column, direction };
-  activeSheet().selectedRows = new Set();
-  activeSheet().selectionAnchor = null;
-  page = 1;
-  dirty();
-  renderSheet();
+  sortColumn(column, direction);
 });
 $('worksheet').addEventListener('keydown', event => {
   const cell = event.target;

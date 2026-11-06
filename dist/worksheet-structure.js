@@ -20,3 +20,7 @@ export function insertRow(data, index) {
   if (data.rows.length >= MAX_ROWS) throw Error('Maximum 1,000,000 rows.');
   data.rows.splice(index, 0, Array(data.headers.length).fill(''));
 }
+
+export function columnClipboardText(data, index) {
+  return [data.headers[index], ...data.rows.map(row => row[index])].join('\n');
+}
