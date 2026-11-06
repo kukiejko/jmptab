@@ -209,6 +209,46 @@ new ResizeObserver(updateHorizontalScroll).observe($('worksheet'));
 new ResizeObserver(updateHorizontalScroll).observe($('tableScroll'));
 function renderColumns(){for(const id of ['response','predictor']){const prev=$(id).value;$(id).innerHTML=data.headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');if(prev!==''&&Number(prev)<data.headers.length)$(id).value=prev;}if($('predictor').value===$('response').value&&data.headers.length>1)$('predictor').value=String((+$('response').value+1)%data.headers.length);}
 $('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined){data.rows[+el.dataset.row][c]=el.value;el.classList.toggle('numeric-value',numeric(el.value)!==null);el.classList.toggle('text-value',numeric(el.value)===null);}else{data.headers[c]=el.value;renderColumns();}dirty();});
+const sheetMenu = document.createElement('div');
+sheetMenu.className = 'sheet-context-menu';
+sheetMenu.setAttribute('role', 'menu');
+sheetMenu.hidden = true;
+document.body.append(sheetMenu);
+function closeSheetMenu() { sheetMenu.hidden = true; sheetMenu.replaceChildren(); }
+function openSheetMenu(kind, index, x, y) {
+  const actions = kind === 'column'
+    ? [['insert-left', 'Insert column left'], ['insert-right', 'Insert column right'], ['move-left', 'Move column left'], ['move-right', 'Move column right']]
+    : [['above', 'Insert row above'], ['below', 'Insert row below']];
+  sheetMenu.replaceChildren(...actions.map(([value, label]) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'menuitem');
+    button.textContent = label;
+    button.onclick = () => {
+      closeSheetMenu();
+      const select = $('worksheet').querySelector(`[data-${kind}-action="${index}"]`);
+      if (!select) return;
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    return button;
+  }));
+  sheetMenu.hidden = false;
+  sheetMenu.style.left = `${Math.max(0, Math.min(x, innerWidth - sheetMenu.offsetWidth - 8))}px`;
+  sheetMenu.style.top = `${Math.max(0, Math.min(y, innerHeight - sheetMenu.offsetHeight - 8))}px`;
+  sheetMenu.querySelector('button')?.focus();
+}
+$('worksheet').addEventListener('click', event => {
+  if (!event.shiftKey || event.button !== 0) return;
+  const column = event.target.closest('[data-sort-column]');
+  const row = event.target.closest('[data-select-row]');
+  if (!column && !row) return;
+  event.preventDefault();
+  event.stopPropagation();
+  openSheetMenu(column ? 'column' : 'row', Number(column?.dataset.sortColumn ?? row.dataset.selectRow), event.clientX, event.clientY);
+}, true);
+document.addEventListener('pointerdown', event => { if (!sheetMenu.hidden && !sheetMenu.contains(event.target)) closeSheetMenu(); });
+document.addEventListener('keydown', event => { if (event.key === 'Escape' && !sheetMenu.hidden) { closeSheetMenu(); event.preventDefault(); } });
 $('worksheet').addEventListener('click', event => {
   const button = event.target.closest('[data-select-row]');
   if (!button) return;

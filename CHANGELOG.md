@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.12 — 2026-11-06
+
+- Added a worksheet action menu on Shift + left click of a column header or row number. Column actions insert and move columns; row actions insert above or below.
+
 ## 0.1.11 — 2026-11-06
 
 - Release prepared: 2026-11-06 01:03:00 CET.
