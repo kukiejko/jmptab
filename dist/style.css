@@ -111,6 +111,8 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 #worksheet .row-heading select { width: 1.45rem; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .8rem; }
 #worksheet tbody tr[data-selected="true"] td, #worksheet tbody tr[data-selected="true"] .row-heading { background: #dceafa; }
 #worksheet tbody tr[data-selected="true"] .row-heading button { color: #164f8e; font-weight: 700; }
+#worksheet [data-selected-column="true"] { background: #dceafa !important; }
+#worksheet [data-selected-column="true"] .sort-column { color: #164f8e; }
 #worksheet thead { position: sticky; top: 0; z-index: 1; background: #edf1f6; }
 #worksheet thead tr:first-child th { position: relative; font-size: .78rem; color: #415875; font-weight: 650; height: 1.48rem; overflow: visible; }
 .row-number-heading { padding-right: .2rem !important; }

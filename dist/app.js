@@ -49,18 +49,18 @@ function renderSheet() {
   const widths = layout.widthsFor(data.headers.length);
   const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
   const headers = data.headers.map((_, index) =>
-    `<th scope="col" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><div class="column-top"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Sort by ${esc(data.headers[index])}">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><select data-column-action="${index}" aria-label="Column ${index + 1} actions" title="Insert or move column"><option value="">⋯</option><option value="insert-left">Insert left</option><option value="insert-right">Insert right</option><option value="move-left">Move left</option><option value="move-right">Move right</option></select></div><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
+    `<th scope="col" data-column-index="${index}" data-selected-column="${activeSheet().selectedColumn === index}" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><div class="column-top"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Select column ${index + 1}; Shift-click to sort" aria-pressed="${activeSheet().selectedColumn === index}" title="Click to select column; Shift-click to sort">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><select data-column-action="${index}" aria-label="Column ${index + 1} actions" title="Insert or move column"><option value="">⋯</option><option value="insert-left">Insert left</option><option value="insert-right">Insert right</option><option value="move-left">Move left</option><option value="move-right">Move right</option></select></div><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
   ).join('');
   const names = data.headers.map((name, column) => {
     const selected = data.roles?.[column] || '';
     const options = `<option value="">Role</option>` + COLUMN_ROLES.map(role =>
       `<option value="${role}"${selected === role ? ' selected' : ''}>${role}</option>`).join('');
-    return `<th><div class="column-meta"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"><select data-column-role="${column}" aria-label="Role for column ${column + 1}">${options}</select></div></th>`;
+    return `<th data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><div class="column-meta"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"><select data-column-role="${column}" aria-label="Role for column ${column + 1}">${options}</select></div></th>`;
   }).join('');
   const rows = data.rows.slice(start, start + PAGE_SIZE).map((row, offset) => {
     const index = start + offset;
     const cells = row.map((value, column) =>
-      `<td><input class="${numeric(value) === null ? 'text-value' : 'numeric-value'}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
+      `<td data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input class="${numeric(value) === null ? 'text-value' : 'numeric-value'}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
     ).join('');
     const selected = activeSheet().selectedRows?.has(index) || false;
     return `<tr data-selected="${selected}"><td class="row-heading"><div class="row-heading-content"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button><select data-row-action="${index}" aria-label="Row ${index + 1} actions" title="Insert row"><option value="">⋯</option><option value="above">Insert above</option><option value="below">Insert below</option></select></div></td>${cells}</tr>`;
@@ -240,12 +240,11 @@ function openSheetMenu(kind, index, x, y) {
 }
 $('worksheet').addEventListener('click', event => {
   if (!event.shiftKey || event.button !== 0) return;
-  const column = event.target.closest('[data-sort-column]');
   const row = event.target.closest('[data-select-row]');
-  if (!column && !row) return;
+  if (!row) return;
   event.preventDefault();
   event.stopPropagation();
-  openSheetMenu(column ? 'column' : 'row', Number(column?.dataset.sortColumn ?? row.dataset.selectRow), event.clientX, event.clientY);
+  openSheetMenu('row', Number(row.dataset.selectRow), event.clientX, event.clientY);
 }, true);
 document.addEventListener('pointerdown', event => { if (!sheetMenu.hidden && !sheetMenu.contains(event.target)) closeSheetMenu(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !sheetMenu.hidden) { closeSheetMenu(); event.preventDefault(); } });
@@ -257,6 +256,9 @@ $('worksheet').addEventListener('click', event => {
     sheet.selectionAnchor ?? null, { shift: event.shiftKey, toggle: event.ctrlKey || event.metaKey });
   sheet.selectedRows = result.selected;
   sheet.selectionAnchor = result.anchor;
+  sheet.selectedColumn = null;
+  $('worksheet').querySelectorAll('[data-selected-column="true"]').forEach(cell => { cell.dataset.selectedColumn = 'false'; });
+  $('worksheet').querySelectorAll('[data-sort-column]').forEach(header => { header.setAttribute('aria-pressed', 'false'); });
   for (const row of $('worksheet').querySelectorAll('tbody tr')) {
     const selected = result.selected.has(Number(row.querySelector('[data-select-row]').dataset.selectRow));
     row.dataset.selected = String(selected);
@@ -274,6 +276,7 @@ $('worksheet').addEventListener('change', event => {
       else if (action === 'move-right' && !moveColumn(data, index, index + 1)) { event.target.value = ''; return; }
       else return;
       activeSheet().sort = null;
+      activeSheet().selectedColumn = null;
       dirty();
       renderSheet();
     } catch (error) { message(error.message); event.target.value = ''; }
@@ -304,6 +307,20 @@ $('worksheet').addEventListener('click', event => {
   const button = event.target.closest('[data-sort-column]');
   if (!button) return;
   const column = Number(button.dataset.sortColumn);
+  if (!event.shiftKey) {
+    const sheet = activeSheet();
+    sheet.selectedColumn = sheet.selectedColumn === column ? null : column;
+    sheet.selectedRows = new Set();
+    sheet.selectionAnchor = null;
+    $('worksheet').querySelectorAll('[data-selected-column]').forEach(cell => {
+      cell.dataset.selectedColumn = String(Number(cell.dataset.columnIndex) === sheet.selectedColumn);
+    });
+    $('worksheet').querySelectorAll('[data-sort-column]').forEach(header => {
+      header.setAttribute('aria-pressed', String(Number(header.dataset.sortColumn) === sheet.selectedColumn));
+    });
+    $('worksheet').querySelectorAll('tbody tr[data-selected="true"]').forEach(row => { row.dataset.selected = 'false'; row.querySelector('[data-select-row]').setAttribute('aria-pressed', 'false'); });
+    return;
+  }
   const direction = activeSheet().sort?.column === column && activeSheet().sort.direction === 'ascending' ? 'descending' : 'ascending';
   data.rows = sortWorksheetRows(data.rows, column, direction);
   activeSheet().sort = { column, direction };
