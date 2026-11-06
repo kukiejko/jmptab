@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { columnClipboardText, insertColumn, insertRow, moveColumn } from '../dist/worksheet-structure.js';
+import { columnClipboardText, deleteRows, insertColumn, insertRow, moveColumn } from '../dist/worksheet-structure.js';
 
 test('column insertion and movement keep headers, roles, and row values together', () => {
   const data = { headers: ['A', 'B'], roles: ['X1', 'Y1'], rows: [['1', '2'], ['3', '4']] };
@@ -17,6 +17,12 @@ test('row insertion adds a complete blank row at the chosen position', () => {
   const data = { headers: ['A', 'B'], rows: [['1', '2'], ['3', '4']] };
   insertRow(data, 1);
   assert.deepEqual(data.rows, [['1', '2'], ['', ''], ['3', '4']]);
+});
+
+test('deleting selected rows preserves the order of complete remaining rows', () => {
+  const data = { headers: ['A', 'B'], rows: [['1', 'a'], ['2', 'b'], ['3', 'c'], ['4', 'd']] };
+  assert.equal(deleteRows(data, [1, 3]), 2);
+  assert.deepEqual(data.rows, [['1', 'a'], ['3', 'c']]);
 });
 
 test('copying a column includes its name and every row, including blanks', () => {

@@ -24,7 +24,7 @@ Choose the down or right arrow in the **#** header to control where Enter moves 
 Right-click a C1/C2 column header for **Copy column**, **Sort ascending**, **Sort descending**, and column roles. Copy puts the column name and every value, including blank rows, on the clipboard.
 Click a row number to select its entire row. Hold Shift to select a range, or Ctrl/Cmd to add or remove individual rows. Numeric cells align left; text cells align right.
 Use the role options in the column right-click menu to label it X1, X2, Y1, Y2, Y3, Z1, Z2, or Z3, or clear the label. Roles are stored with each worksheet and do not alter its cell values.
-Use the ⋯ menu in a column header to insert a column on either side or move it left or right. The menu beside a row number inserts a row above or below it. Shift + left click a row number also opens its menu. **+ Column** and **+ Row** still append at the end.
+Use the ⋯ menu in a column header to insert a column on either side or move it left or right. Right-click a selected row number to insert above or below it or delete the selected row(s). **+ Column** and **+ Row** still append at the end.
 
 ## Code layout and testing
 

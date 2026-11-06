@@ -106,9 +106,7 @@ body.is-resizing[data-resize-axis="y"] { cursor: row-resize; }
 #worksheet th, #worksheet td { padding: 0; border-right: 1px solid #e0e5ec; border-bottom: 1px solid #e0e5ec; overflow: hidden; }
 #worksheet th:first-child, #worksheet td:first-child { text-align: right; padding-right: .55rem; color: var(--muted); background: #f1f4f8; font-variant-numeric: tabular-nums; }
 #worksheet .row-heading { padding: 0; }
-#worksheet .row-heading-content { display: flex; align-items: stretch; }
-#worksheet .row-heading button { flex: 1; min-width: 0; padding: .31rem .2rem; text-align: right; border-radius: 0; color: inherit; }
-#worksheet .row-heading select { width: 1.45rem; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: .8rem; }
+#worksheet .row-heading button { display: block; width: 100%; padding: .31rem .55rem; text-align: right; border-radius: 0; color: inherit; }
 #worksheet tbody tr[data-selected="true"] td, #worksheet tbody tr[data-selected="true"] .row-heading { background: #dceafa; }
 #worksheet tbody tr[data-selected="true"] .row-heading button { color: #164f8e; font-weight: 700; }
 #worksheet [data-selected-column="true"] { background: #dceafa !important; }

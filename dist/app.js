@@ -6,7 +6,7 @@ import { parseXML } from './xml-import.js';
 import { blankWorksheet, COLUMN_ROLES, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
 import { sortWorksheetRows } from './worksheet-sort.js';
 import { selectRows } from './row-selection.js';
-import { columnClipboardText, insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
+import { columnClipboardText, deleteRows, insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
 import { saveSession, loadSession } from './session.js';
 import {summary,parseCSV,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
@@ -60,7 +60,7 @@ function renderSheet() {
       `<td data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input class="${numeric(value) === null ? 'text-value' : 'numeric-value'}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
     ).join('');
     const selected = activeSheet().selectedRows?.has(index) || false;
-    return `<tr data-selected="${selected}"><td class="row-heading"><div class="row-heading-content"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button><select data-row-action="${index}" aria-label="Row ${index + 1} actions" title="Insert row"><option value="">⋯</option><option value="above">Insert above</option><option value="below">Insert below</option></select></div></td>${cells}</tr>`;
+    return `<tr data-selected="${selected}"><td class="row-heading"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button></td>${cells}</tr>`;
   }).join('');
   $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col" class="row-number-heading"><label for="enterDirection">#</label><select id="enterDirection" aria-label="Enter direction" title="Enter moves down or right"><option value="down">↓</option><option value="right">→</option></select></th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
   $('enterDirection').value = enterDirection;
@@ -225,9 +225,8 @@ function openSheetMenu(kind, index, x, y) {
   const actions = kind === 'column-context'
     ? [['copy', 'Copy column'], ['sort-ascending', 'Sort ascending'], ['sort-descending', 'Sort descending'],
       ['role-', 'Role: none'], ...COLUMN_ROLES.map(role => [`role-${role}`, `Role: ${role}`])]
-    : kind === 'column'
-    ? [['insert-left', 'Insert column left'], ['insert-right', 'Insert column right'], ['move-left', 'Move column left'], ['move-right', 'Move column right']]
-    : [['above', 'Insert row above'], ['below', 'Insert row below']];
+    : [['above', 'Insert row above'], ['below', 'Insert row below'],
+      ['delete', activeSheet().selectedRows?.size > 1 ? 'Delete selected rows' : 'Delete row']];
   sheetMenu.replaceChildren(...actions.map(([value, label]) => {
     const button = document.createElement('button');
     button.type = 'button';
@@ -256,10 +255,15 @@ function openSheetMenu(kind, index, x, y) {
         } else sortColumn(index, value === 'sort-ascending' ? 'ascending' : 'descending');
         return;
       }
-      const select = $('worksheet').querySelector(`[data-${kind}-action="${index}"]`);
-      if (!select) return;
-      select.value = value;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+      try {
+        if (value === 'delete') deleteRows(data, activeSheet().selectedRows || [index]);
+        else insertRow(data, index + (value === 'below' ? 1 : 0));
+        activeSheet().selectedRows = new Set();
+        activeSheet().selectionAnchor = null;
+        activeSheet().sort = null;
+        dirty();
+        renderSheet();
+      } catch (error) { message(error.message); }
     };
     return button;
   }));
@@ -268,19 +272,24 @@ function openSheetMenu(kind, index, x, y) {
   sheetMenu.style.top = `${Math.max(0, Math.min(y, innerHeight - sheetMenu.offsetHeight - 8))}px`;
   sheetMenu.querySelector('button')?.focus();
 }
-$('worksheet').addEventListener('click', event => {
-  if (!event.shiftKey || event.button !== 0) return;
-  const row = event.target.closest('[data-select-row]');
-  if (!row) return;
-  event.preventDefault();
-  event.stopPropagation();
-  openSheetMenu('row', Number(row.dataset.selectRow), event.clientX, event.clientY);
-}, true);
 $('worksheet').addEventListener('contextmenu', event => {
   const header = event.target.closest('thead tr:first-child th[data-column-index]');
-  if (!header) return;
+  if (header) {
+    event.preventDefault();
+    openSheetMenu('column-context', Number(header.dataset.columnIndex), event.clientX, event.clientY);
+    return;
+  }
+  const rowButton = event.target.closest('[data-select-row]');
+  if (!rowButton) return;
   event.preventDefault();
-  openSheetMenu('column-context', Number(header.dataset.columnIndex), event.clientX, event.clientY);
+  const index = Number(rowButton.dataset.selectRow);
+  if (!activeSheet().selectedRows?.has(index)) {
+    activeSheet().selectedRows = new Set([index]);
+    activeSheet().selectionAnchor = index;
+    activeSheet().selectedColumn = null;
+    renderSheet();
+  }
+  openSheetMenu('row', index, event.clientX, event.clientY);
 });
 document.addEventListener('pointerdown', event => { if (!sheetMenu.hidden && !sheetMenu.contains(event.target)) closeSheetMenu(); });
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !sheetMenu.hidden) { closeSheetMenu(); event.preventDefault(); } });
@@ -313,17 +322,6 @@ $('worksheet').addEventListener('change', event => {
       else return;
       activeSheet().sort = null;
       activeSheet().selectedColumn = null;
-      dirty();
-      renderSheet();
-    } catch (error) { message(error.message); event.target.value = ''; }
-    return;
-  }
-  if (event.target.matches('[data-row-action]')) {
-    const index = Number(event.target.dataset.rowAction);
-    try {
-      insertRow(data, index + (event.target.value === 'below' ? 1 : 0));
-      activeSheet().selectedRows = new Set();
-      activeSheet().selectionAnchor = null;
       dirty();
       renderSheet();
     } catch (error) { message(error.message); event.target.value = ''; }

@@ -21,6 +21,13 @@ export function insertRow(data, index) {
   data.rows.splice(index, 0, Array(data.headers.length).fill(''));
 }
 
+export function deleteRows(data, indices) {
+  const selected = new Set(indices);
+  const count = data.rows.length;
+  data.rows = data.rows.filter((_, index) => !selected.has(index));
+  return count - data.rows.length;
+}
+
 export function columnClipboardText(data, index) {
   return [data.headers[index], ...data.rows.map(row => row[index])].join('\n');
 }
