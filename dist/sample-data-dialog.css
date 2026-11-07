@@ -4,6 +4,9 @@
 .sample-data-fields input, .sample-data-fields select { width: 100%; min-width: 0; padding: .4rem; border: 1px solid #adbed2; border-radius: 3px; background: white; color: inherit; }
 .sample-data-dialog .scatter-only, .sample-data-dialog .box-only { display: none; }
 .sample-data-dialog.sample-scatter .scatter-only, .sample-data-dialog.sample-box .box-only { display: block; }
+.sample-data-dialog .normal-only, .sample-data-dialog .outlier-only { display: none; }
+.sample-data-dialog.sample-normal .normal-only, .sample-data-dialog.sample-outliers .outlier-only { display: block; }
+.sample-data-dialog #sampleOutliers { width: auto; justify-self: start; }
 .sample-data-description { margin: 0 1rem 1rem; color: var(--muted); font-size: .86rem; line-height: 1.45; }
 .sample-data-error { margin: 0 1rem 1rem; color: #a32323; }
 @media (max-width: 420px) { .sample-data-fields { grid-template-columns: 1fr; gap: .3rem; } .sample-data-fields input, .sample-data-fields select { margin-bottom: .45rem; } }
