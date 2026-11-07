@@ -29,7 +29,7 @@ export function setupBoxplotBuilder({ getData, onCreate, escape }) {
           <div class="bp-fields"><button type="button" id="bpBack">← Change graph type</button><strong id="bpLayoutName"></strong>
             <label for="bpY">Graph variables (Y)</label><select id="bpY" multiple size="6" aria-label="Graph variables Y"></select>
             <label for="bpGroups" id="bpGroupsLabel">Categorical variables for grouping (X), 1–4</label><select id="bpGroups" multiple size="5" aria-label="Categorical variables for grouping"></select>
-            <small class="bp-selection-hint">Use Ctrl or Command to select multiple columns.</small>
+            <small class="bp-selection-hint">Use Ctrl or Command to select multiple columns. Double-click a variable in either field to remove it.</small>
             <p id="bpValidation" role="status"></p>
             <div class="bp-settings-buttons"><button type="button" data-bp-settings="Scale">Scale...</button><button type="button" data-bp-settings="Labels">Labels...</button><button type="button" data-bp-settings="Data View">Data View...</button><button type="button" data-bp-settings="Multiple Graphs">Multiple Graphs...</button><button type="button" data-bp-settings="Data Options">Data Options...</button></div>
           </div>
@@ -184,6 +184,12 @@ export function setupBoxplotBuilder({ getData, onCreate, escape }) {
   }
   for (const field of [$('bpY'), $('bpGroups')]) {
     field.addEventListener('change', render);
+    field.addEventListener('dblclick', event => {
+      const option = event.target.closest('option') || field.selectedOptions[0];
+      if (!option) return;
+      option.selected = false;
+      render();
+    });
     field.addEventListener('dragover', event => event.preventDefault());
     field.addEventListener('drop', event => {
       event.preventDefault();
