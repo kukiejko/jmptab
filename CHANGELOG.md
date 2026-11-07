@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.24 — 2026-11-07
+
+- Normal sample generation now uses mean and sigma without minimum or maximum fields or clipping; the other distributions retain range controls.
+
 ## 0.1.23 — 2026-11-07
 
 - Added a local development dashboard with task approvals, pause control, test progress, event history and restore tags for approved big changes.

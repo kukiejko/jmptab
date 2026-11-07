@@ -2,8 +2,8 @@
 .sample-data-fields { display: grid; grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 1fr); align-items: center; gap: .65rem .8rem; padding: 1rem; }
 .sample-data-fields label { font-weight: 550; }
 .sample-data-fields input, .sample-data-fields select { width: 100%; min-width: 0; padding: .4rem; border: 1px solid #adbed2; border-radius: 3px; background: white; color: inherit; }
-.sample-data-dialog .scatter-only, .sample-data-dialog .box-only { display: none; }
-.sample-data-dialog.sample-scatter .scatter-only, .sample-data-dialog.sample-box .box-only { display: block; }
+.sample-data-dialog .range-only, .sample-data-dialog .range-scatter-only, .sample-data-dialog .box-only { display: none; }
+.sample-data-dialog:not(.sample-normal) .range-only, .sample-data-dialog.sample-scatter:not(.sample-normal) .range-scatter-only, .sample-data-dialog.sample-box .box-only { display: block; }
 .sample-data-dialog .normal-only, .sample-data-dialog .outlier-only { display: none; }
 .sample-data-dialog.sample-normal .normal-only, .sample-data-dialog.sample-outliers .outlier-only { display: block; }
 .sample-data-dialog #sampleOutliers { width: auto; justify-self: start; }

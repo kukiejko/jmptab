@@ -9,10 +9,10 @@ export function setupSampleDataDialog({ onGenerate }) {
           <label for="sampleType">Data for</label><select id="sampleType" name="type"><option value="boxplot">Boxplot</option><option value="scatterplot">Scatterplot</option><option value="histogram">Histogram</option></select>
           <label for="sampleDistribution">Distribution</label><select id="sampleDistribution" name="distribution"><option value="normal">Normal</option><option value="uniform">Uniform</option><option value="exponential">Exponential</option><option value="bimodal">Bimodal</option></select>
           <label for="sampleCount">Number of points</label><input id="sampleCount" name="count" type="number" min="2" max="1048576" step="1" required>
-          <label for="sampleMin" id="sampleMinLabel">Value minimum</label><input id="sampleMin" name="min" type="number" step="any" required>
-          <label for="sampleMax" id="sampleMaxLabel">Value maximum</label><input id="sampleMax" name="max" type="number" step="any" required>
-          <label for="sampleYMin" class="scatter-only">Y minimum</label><input id="sampleYMin" class="scatter-only" name="yMin" type="number" step="any">
-          <label for="sampleYMax" class="scatter-only">Y maximum</label><input id="sampleYMax" class="scatter-only" name="yMax" type="number" step="any">
+          <label for="sampleMin" id="sampleMinLabel" class="range-only">Value minimum</label><input id="sampleMin" class="range-only" name="min" type="number" step="any">
+          <label for="sampleMax" id="sampleMaxLabel" class="range-only">Value maximum</label><input id="sampleMax" class="range-only" name="max" type="number" step="any">
+          <label for="sampleYMin" class="range-scatter-only">Y minimum</label><input id="sampleYMin" class="range-scatter-only" name="yMin" type="number" step="any">
+          <label for="sampleYMax" class="range-scatter-only">Y maximum</label><input id="sampleYMax" class="range-scatter-only" name="yMax" type="number" step="any">
           <label for="sampleGroups" class="box-only">Number of groups</label><input id="sampleGroups" class="box-only" name="groups" type="number" min="2" max="8" step="1">
           <label for="sampleMean" class="normal-only">Mean (μ)</label><input id="sampleMean" class="normal-only" name="mean" type="number" step="any">
           <label for="sampleSigma" class="normal-only">Sigma (σ)</label><input id="sampleSigma" class="normal-only" name="sigma" type="number" step="any" min="0">
@@ -59,7 +59,7 @@ export function setupSampleDataDialog({ onGenerate }) {
     event.preventDefault();
     const type = field('type').value;
     const distribution = field('distribution').value;
-    const fields = ['count', 'min', 'max', ...(type === 'scatterplot' ? ['yMin', 'yMax'] : []), ...(type === 'boxplot' ? ['groups'] : []), ...(distribution === 'normal' ? ['mean', 'sigma', ...(field('outliers').checked ? ['outlierPercent'] : [])] : [])];
+    const fields = ['count', ...(distribution === 'normal' ? [] : ['min', 'max', ...(type === 'scatterplot' ? ['yMin', 'yMax'] : [])]), ...(type === 'boxplot' ? ['groups'] : []), ...(distribution === 'normal' ? ['mean', 'sigma', ...(field('outliers').checked ? ['outlierPercent'] : [])] : [])];
     const settings = Object.fromEntries(fields.map(name => [name, field(name).value]));
     try {
       if (Object.values(settings).some(value => value === '')) throw new Error('Complete all visible fields.');

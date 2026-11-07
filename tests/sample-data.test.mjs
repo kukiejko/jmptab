@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { generateSampleData, SAMPLE_DEFAULTS } from '../dist/sample-data.js';
 
 for (const type of Object.keys(SAMPLE_DEFAULTS)) {
-  test(`${type} sample respects point count and ranges`, () => {
-    const settings = { type, count: 31, min: -4, max: 8, ...(type === 'scatterplot' ? { yMin: 20, yMax: 30 } : {}), ...(type === 'boxplot' ? { groups: 3 } : {}) };
+  test(`${type} non-normal sample respects point count and ranges`, () => {
+    const settings = { type, distribution: 'uniform', count: 31, min: -4, max: 8, ...(type === 'scatterplot' ? { yMin: 20, yMax: 30 } : {}), ...(type === 'boxplot' ? { groups: 3 } : {}) };
     const first = generateSampleData(settings);
     assert.deepEqual(first, generateSampleData(settings));
     assert.equal(first.rows.length, 31);
@@ -17,12 +17,23 @@ for (const type of Object.keys(SAMPLE_DEFAULTS)) {
 test('sample settings reject counts, ranges, and groups outside limits', () => {
   for (const settings of [
     { type: 'histogram', count: 1 }, { type: 'histogram', count: 1_048_577 },
-    { type: 'boxplot', min: 5, max: 5 }, { type: 'boxplot', groups: 9 },
-    { type: 'scatterplot', yMin: 10, yMax: 2 },
+    { type: 'boxplot', distribution: 'uniform', min: 5, max: 5 }, { type: 'boxplot', groups: 9 },
+    { type: 'scatterplot', distribution: 'uniform', yMin: 10, yMax: 2 },
     { type: 'histogram', distribution: 'normal', sigma: 0 },
     { type: 'histogram', distribution: 'normal', outliers: true, outlierPercent: 26 },
     { type: 'histogram', distribution: 'unknown' }
   ]) assert.throws(() => generateSampleData(settings));
+});
+
+test('normal samples use mean and sigma without clipping to range fields', () => {
+  for (const type of Object.keys(SAMPLE_DEFAULTS)) {
+    const sample = generateSampleData({ type, count: 1000, mean: 10, sigma: 2, min: 0, max: 1, yMin: 0, yMax: 1 });
+    const x = sample.rows.map(row => Number(row[0]));
+    assert.ok(x.some(value => value > 1));
+    assert.ok(x.some(value => value < 10));
+    assert.ok(x.some(value => value > 10));
+    if (type === 'scatterplot') assert.ok(sample.rows.some(row => Number(row[1]) > 1));
+  }
 });
 
 test('normal samples default to mean zero and sigma one, with optional outliers', () => {

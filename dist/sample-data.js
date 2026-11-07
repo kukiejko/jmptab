@@ -23,8 +23,8 @@ export function generateSampleData(input, random = randomSource(4711)) {
   const min = Number(settings.min);
   const max = Number(settings.max);
   if (!Number.isInteger(count) || count < 2 || count > MAX_ROWS) throw new Error('Point count must be a whole number from 2 to 1,048,576.');
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) throw new Error('Minimum must be less than maximum.');
   if (!SAMPLE_DISTRIBUTIONS.includes(settings.distribution)) throw new Error('Choose a distribution.');
+  if (settings.distribution !== 'normal' && (!Number.isFinite(min) || !Number.isFinite(max) || min >= max)) throw new Error('Minimum must be less than maximum.');
   const mean = Number(settings.mean);
   const sigma = Number(settings.sigma);
   const outlierPercent = Number(settings.outlierPercent);
@@ -32,7 +32,7 @@ export function generateSampleData(input, random = randomSource(4711)) {
   if (settings.distribution === 'normal' && settings.outliers && (!Number.isFinite(outlierPercent) || outlierPercent < 0 || outlierPercent > 25)) throw new Error('Outlier percentage must be from 0 to 25.');
   const unit = () => clamp(Number(random()), 0, 1 - Number.EPSILON);
   const normal = () => Math.sqrt(-2 * Math.log(Math.max(Number.MIN_VALUE, unit()))) * Math.cos(2 * Math.PI * unit());
-  const value = (low, high, number) => String(clamp(number, low, high));
+  const value = (low, high, number) => String(settings.distribution === 'normal' ? number : clamp(number, low, high));
   const draw = (low, high, offset = 0, index = 0) => {
     let number;
     switch (settings.distribution) {
@@ -50,9 +50,13 @@ export function generateSampleData(input, random = randomSource(4711)) {
   if (type === 'scatterplot') {
     const yMin = Number(settings.yMin);
     const yMax = Number(settings.yMax);
-    if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMin >= yMax) throw new Error('Y minimum must be less than Y maximum.');
+    if (settings.distribution !== 'normal' && (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMin >= yMax)) throw new Error('Y minimum must be less than Y maximum.');
     return { headers: ['X', 'Y'], rows: Array.from({ length: count }, (_, index) => {
       const x = Number(draw(min, max, 0, index));
+      if (settings.distribution === 'normal') {
+        const y = mean + 0.75 * (x - mean) + sigma * normal() * 0.5;
+        return [String(x), String(y)];
+      }
       const fraction = (x - min) / (max - min);
       const noise = (settings.distribution === 'normal' ? normal() * 0.12 : (unit() - 0.5) * 0.35);
       const y = yMin + (yMax - yMin) * clamp(0.12 + 0.76 * fraction + noise, 0, 1);
