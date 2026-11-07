@@ -1,6 +1,6 @@
 # jmptab development workflow
 
-Read `docs/DEVELOPMENT_SETUP.md` before a large change. Keep tasks in `.devboard/state/tasks.json` using `npm run task:add`. Check `.devboard/state/PAUSE` before starting work. A pause means stop at the next safe point until the owner resumes.
+Read `docs/DEVELOPMENT_SETUP.md` before a large change. For each code change, create a task card with `npm run task:add` before editing, keep its status current, and mark it `done` when verified. The dashboard reads cards from `.devboard/state/tasks.json`; it does not discover Git commits or requests automatically. Check `.devboard/state/PAUSE` before starting work. A pause means stop at the next safe point until the owner resumes.
 
 For protected files (`server.mjs`, devboard state/guard/server logic, deployment scripts and GitHub workflows), use an approved `big` task. A waiting approval card is a request for the owner, not permission to modify or deploy. Existing user authorization for a specific change takes precedence; do the authorized implementation without asking again.
 

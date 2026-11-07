@@ -29,6 +29,7 @@ npm run test:tracked
 ```
 
 Task state is in ignored `.devboard/state/tasks.json`, events in `events.jsonl`, pause switch in `PAUSE` and test progress in `tests.json`. `npm run test:tracked` runs the full Node suite and updates progress; it does not replace `npm test`. The progress total becomes known when TAP reports it at the end; until then the dashboard shows completed tests.
+The dashboard starts with no task cards on a new checkout. Add a card for each code change and update its status as work proceeds. These local state files are intentionally not committed, so another laptop has its own task list.
 
 ## Guards
 
