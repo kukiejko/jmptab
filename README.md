@@ -48,6 +48,7 @@ Right-click a column header to insert a column on either side, move it left or r
 
 Run `npm test` after changing calculations or analysis wiring. The Help dialog displays the package version and the local server start time from `/app-info.json`.
 See [CHANGELOG.md](CHANGELOG.md) for version history and deployment time semantics.
+For development tasks, approvals, pause control and tracked test progress, see [Development setup](docs/DEVELOPMENT_SETUP.md). Run `npm run devboard` to open the local dashboard on port 8765.
 
 ## Features
 

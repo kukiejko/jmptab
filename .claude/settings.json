@@ -1,0 +1,6 @@
+{
+  "hooks": {
+    "PreToolUse": [{ "hooks": [{ "type": "command", "command": "node devboard/hook.mjs pre" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "command", "command": "node devboard/hook.mjs post" }] }]
+  }
+}

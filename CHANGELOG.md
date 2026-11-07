@@ -2,6 +2,11 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.23 — 2026-11-07
+
+- Added a local development dashboard with task approvals, pause control, test progress, event history and restore tags for approved big changes.
+- Added project workflow guidance and Claude Code guard hooks. Codex users can run the same guard logic manually; Codex does not automatically load `.claude/settings.json`.
+
 ## 0.1.22 — 2026-11-07
 
 - Increased per-worksheet limits to 1,048,576 rows and 16,384 columns. Wide worksheets render 40 columns at a time and retain empty trailing cells sparsely.

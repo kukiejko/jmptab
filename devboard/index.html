@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>jmptab devboard</title>
+  <style>
+    :root { font: 15px system-ui, sans-serif; color: #14243b; background: #edf2f7; }
+    body { margin: 0 auto; max-width: 1500px; padding: 24px; }
+    header, .panel, .lane { background: white; border: 1px solid #cbd7e5; border-radius: 8px; padding: 18px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+    h1 { margin: 0; font-size: 24px; } h2 { margin: 0 0 14px; font-size: 17px; }
+    button { padding: 7px 12px; border: 1px solid #6f91b7; border-radius: 5px; background: #e8f1fa; color: #143a65; cursor: pointer; }
+    button:hover { background: #d6e8fa; } button.danger { background: #fff0ee; color: #9a332d; }
+    .meta, small { color: #52677e; } .panel { margin-top: 16px; }
+    .lanes { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+    .card { border: 1px solid #d0deeb; border-radius: 6px; padding: 12px; margin-top: 10px; overflow-wrap: anywhere; }
+    .card strong { display: block; margin-bottom: 5px; }
+    .badge { display: inline-block; background: #e8f1fa; padding: 3px 6px; border-radius: 4px; margin: 4px 4px 4px 0; font-size: 12px; }
+    .actions { display: flex; gap: 6px; margin-top: 9px; }
+    progress { width: 100%; height: 14px; }
+    #events { max-height: 280px; overflow: auto; } #events li { margin: 6px 0; }
+    #error { color: #a22323; } .paused { color: #9a332d; font-weight: 700; }
+    @media (max-width: 1100px) { .lanes { grid-template-columns: repeat(2, minmax(200px, 1fr)); } }
+    @media (max-width: 550px) { body { padding: 10px; } header { display: block; } .lanes { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header><div><h1>jmptab · devboard</h1><div id="meta" class="meta"></div></div><div><span id="status"></span> <button id="pause"></button></div></header>
+  <p id="error" role="alert"></p>
+  <section class="panel"><h2>Testy</h2><div id="testText">Brak uruchomionych testów</div><progress id="progress" value="0" max="1"></progress><small id="current"></small></section>
+  <main class="lanes" id="lanes"></main>
+  <section class="panel"><h2>Ostatnie zdarzenia</h2><ol id="events"></ol></section>
+  <script>
+    const groups = [['todo','Do zrobienia'],['in_progress','W toku'],['waiting','Czeka na akceptację'],['done','Zakończone'],['open','Otwarte']];
+    const $ = (id) => document.getElementById(id);
+    function el(tag, content, cls) { const node = document.createElement(tag); node.textContent = content; if (cls) node.className = cls; return node; }
+    async function act(path, body) {
+      try {
+        const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error);
+        $('error').textContent = ''; await load();
+      } catch (error) { $('error').textContent = error.message; }
+    }
+    function card(task) {
+      const node = el('article', '', 'card');
+      node.append(el('strong', task.title), el('small', `${task.id} · ${task.agent || 'brak roli'}`));
+      if (task.big) node.append(el('span', 'duża zmiana', 'badge'));
+      if (task.status === 'approved' || task.status === 'rejected') node.append(el('span', task.status, 'badge'));
+      if (task.restore) node.append(el('span', task.restore, 'badge'));
+      if (task.detail) node.append(el('p', task.detail));
+      if (Number.isInteger(task.budget)) { node.append(el('small', `${task.steps || 0} / ${task.budget} kroków`)); const bar = document.createElement('progress'); bar.max = Math.max(task.budget, 1); bar.value = Math.min(task.steps || 0, bar.max); node.append(bar); }
+      if (task.status === 'waiting') {
+        const actions = el('div', '', 'actions');
+        for (const [label, decision] of [['Zatwierdź','approved'],['Odrzuć','rejected']]) { const button = el('button', label, decision === 'rejected' ? 'danger' : ''); button.onclick = () => act(`/api/tasks/${task.id}/decision`, { decision }); actions.append(button); }
+        node.append(actions);
+      }
+      return node;
+    }
+    async function load() {
+      try {
+        const response = await fetch('/api/state'); if (!response.ok) throw new Error('Nie można pobrać stanu');
+        const state = await response.json();
+        $('meta').textContent = `Wersja ${state.version} · panel uruchomiony ${new Date(state.startedAt).toLocaleString()} · zadań ${state.tasks.length}`;
+        $('status').textContent = state.paused ? 'Wstrzymane' : 'Praca trwa'; $('status').className = state.paused ? 'paused' : '';
+        $('pause').textContent = state.paused ? 'Wznów' : 'Pauza'; $('pause').onclick = () => act('/api/pause', { paused: !state.paused });
+        const lanes = $('lanes'); lanes.replaceChildren();
+        for (const [key, label] of groups) { const items = state.tasks.filter((task) => key === 'todo' ? ['todo','approved'].includes(task.status) : key === 'done' ? ['done','rejected'].includes(task.status) : task.status === key); const lane = el('section', '', 'lane'); lane.append(el('h2', `${label} (${items.length})`), ...items.map(card)); lanes.append(lane); }
+        const events = $('events'); events.replaceChildren(...state.events.map((event) => el('li', `${new Date(event.at).toLocaleString()} · ${event.type}: ${event.detail}`)));
+        if (state.tests) { const test = state.tests; $('testText').textContent = `${test.status} · ${test.done}${test.total == null ? '' : ` / ${test.total}`} · błędów ${test.failures} · start ${new Date(test.startedAt).toLocaleString()}`; $('progress').max = test.total || Math.max(test.done, 1); $('progress').value = test.done; $('current').textContent = test.current || ''; }
+      } catch (error) { $('error').textContent = error.message; }
+    }
+    load(); setInterval(load, 3000);
+  </script>
+</body>
+</html>
