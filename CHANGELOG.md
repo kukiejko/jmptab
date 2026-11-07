@@ -2,6 +2,12 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.18 — 2026-11-07
+
+- Added a dedicated boxplot builder with four data layouts, numeric and categorical column selection, and separate Scale, Labels, Data View, Multiple Graphs, and Data Options dialogs.
+- Added Tukey whiskers, outliers, grouping, paneling, data filtering, linear/log scales, horizontal layout, configurable visual layers, reference lines, and hover statistics.
+- Boxplot output is saved in session history; multi-panel SVG export includes every panel.
+
 ## 0.1.17 — 2026-11-06
 
 - Removed the inline column action menu. Right-click a C1/C2 header to insert, move, or delete a column; role choices are grouped in X, Y, Z, and G submenus.

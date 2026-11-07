@@ -12,6 +12,8 @@ npm start
 
 Open http://127.0.0.1:4173. Use Stat or Graph to open an analysis dialog, then select a result in the Navigator to revisit it. Run `npm test` for calculation and import tests.
 
+Choose **Graph → Boxplot** or select Boxplot in Graph Builder. Pick one of four layouts, choose numeric Y columns and up to four categorical grouping columns, then use **Scale**, **Labels**, **Data View**, **Multiple Graphs**, and **Data Options** for axes, annotations, visual layers, paneling, and a temporary row filter. Generate adds the chart to session results. Hover or focus a box for quartiles, IQR, whiskers, and sample size; hover an outlier star for its value.
+
 Use **Open CSV/XML** to import a CSV file or a tabular XML file. Row-based XML uses repeated `<row>`, `<record>`, `<item>`, `<entry>`, or `<observation>` elements with named child elements, named `<field>` elements, or attributes. Repeated elements with another name also work when they have fields. See [row-based XML](examples/measurements.xml). Excel 2003 SpreadsheetML (`Workbook` XML) uses its first worksheet and first row as the column headers; see the [SpreadsheetML example](examples/spreadsheetml.xml). XML with nested field objects or a different schema needs conversion to one of these layouts before import.
 
 Drag the bar beside Navigator or above Worksheet to resize the panes. Drag a column's right-edge grip in the C1/C2 header to change its width, or double-click it to fit the widest header or cell value across all rows. Double-click a pane divider to reset it; arrow keys also work when a grip has focus. Dialogs resize from their lower-right corner. Pane and column sizes are stored in this browser.
@@ -30,6 +32,7 @@ Right-click a column header to insert a column on either side, move it left or r
 
 - `dist/stats.js`, `dist/inference.js`, `dist/quality.js`, and `dist/time-series.js` contain browser-independent calculations.
 - `dist/analysis-execution.js` selects a calculation from worksheet data and plain options. New analyses should be added here and tested through this entry point.
+- `dist/builder-boxplot.js` groups and filters worksheet observations, calculates box statistics, and draws boxplots independently of the browser UI. `dist/boxplot-builder.js` owns the dedicated configuration dialog.
 - `dist/analysis-rendering.js` turns calculation results into chart HTML and export text. Its entry point is also browser independent.
 - `dist/chart.js` draws SVG charts, while `dist/result-format.js` provides shared HTML escaping and number formatting.
 - `dist/layout-resize.js` owns pane and worksheet column resizing, keyboard controls, and browser-local layout settings.

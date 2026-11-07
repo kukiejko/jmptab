@@ -7,6 +7,7 @@
   <title>jmptab · Statistical Workbench</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="graph-builder.css">
+  <link rel="stylesheet" href="boxplot-builder.css">
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -31,7 +32,7 @@
       <details><summary>File</summary><div class="menu"><button data-action="importBtn">Open CSV or XML…</button><button data-action="saveBtn">Save session</button><button data-action="exportBtn">Export worksheet…</button><button data-action="reportBtn">Export report…</button></div></details>
       <details><summary>Data</summary><div class="menu"><button data-action="addRow">Insert row</button><button data-action="addCol">Insert column</button><button data-action="sampleBtn">Load sample data</button></div></details>
       <details><summary>Stat</summary><div class="menu"><button data-analysis="summary">Descriptive statistics…</button><button data-analysis="one-sample-t">1-Sample t…</button><button data-analysis="correlation">Correlation…</button><button data-analysis="regression">Linear regression…</button><button data-analysis="control">Individuals control chart…</button><button data-analysis="p-chart">P chart…</button><button data-analysis="xbar-chart">Xbar chart…</button><button data-analysis="moving-average">Moving average…</button><button data-analysis="exponential-smoothing">Single exponential smoothing…</button><button data-analysis="capability">Process capability…</button></div></details>
-      <details><summary>Graph</summary><div class="menu"><button id="graphMenuBtn">Graph Builder…</button><button id="histogramMenuBtn">Histogram…</button></div></details>
+      <details><summary>Graph</summary><div class="menu"><button id="graphMenuBtn">Graph Builder…</button><button id="histogramMenuBtn">Histogram…</button><button id="boxplotMenuBtn">Boxplot…</button></div></details>
       <details><summary>View</summary><div class="menu"><button data-action="toggleNavigator">Toggle Navigator</button><button data-action="focusOutput">Focus Output Pane</button><button data-action="focusSheet">Focus worksheet</button></div></details>
       <details><summary>Help</summary><div class="menu"><button id="helpBtn">Methods &amp; help</button></div></details>
     </nav>

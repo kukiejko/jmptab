@@ -1,4 +1,5 @@
 import { setupGraphBuilder } from './graph-builder.js';
+import { setupBoxplotBuilder } from './boxplot-builder.js';
 import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
@@ -737,19 +738,39 @@ function showResult(result) {
   $('outputScroll').scrollTop = 0;
 }
 
+const openBoxplotBuilder = setupBoxplotBuilder({ getData: () => data, onCreate: addGraphResult, escape: esc });
 const openGraphBuilder = setupGraphBuilder({
   getData: () => data,
   drawChart: svgChart,
   escape: esc,
-  onCreate: addGraphResult
+  onCreate: addGraphResult,
+  onBoxplot: openBoxplotBuilder
 });
 $('graphBuilderBtn').onclick = $('graphMenuBtn').onclick = () => openGraphBuilder();
 $('histogramMenuBtn').onclick = () => openGraphBuilder('histogram');
+$('boxplotMenuBtn').onclick = openBoxplotBuilder;
 $('results').addEventListener('click', event => {
   if (!event.target.closest('[data-export-graph]')) return;
-  const chart = $('results').querySelector('svg.chart');
-  if (!chart) return;
-  const exportChart = chart.cloneNode(true);
+  const charts = [...$('results').querySelectorAll('svg.chart')];
+  if (!charts.length) return;
+  let exportChart = charts[0].cloneNode(true);
+  if (charts.length > 1) {
+    const namespace = 'http://www.w3.org/2000/svg';
+    exportChart = document.createElementNS(namespace, 'svg');
+    const widths = charts.map(chart => Number(chart.viewBox.baseVal.width));
+    const heights = charts.map(chart => Number(chart.viewBox.baseVal.height));
+    exportChart.setAttribute('viewBox', `0 0 ${Math.max(...widths)} ${heights.reduce((sum, height) => sum + height, 0)}`);
+    let y = 0;
+    charts.forEach((chart, index) => {
+      const panel = chart.cloneNode(true);
+      panel.setAttribute('x', '0');
+      panel.setAttribute('y', String(y));
+      panel.setAttribute('width', String(widths[index]));
+      panel.setAttribute('height', String(heights[index]));
+      exportChart.append(panel);
+      y += heights[index];
+    });
+  }
   exportChart.setAttribute('font-family', 'Segoe UI, sans-serif');
   exportChart.setAttribute('font-size', '10');
   const heading = $('results').querySelector('h3').textContent;

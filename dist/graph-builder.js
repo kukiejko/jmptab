@@ -103,7 +103,7 @@ function scatterPoints(rows, xColumn, yColumn) {
   return { points, n: count, bounds: { xmin, xmax, ymin, ymax } };
 }
 
-export function setupGraphBuilder({ getData, drawChart, escape, onCreate }) {
+export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxplot }) {
   const dialog = $('graphBuilder');
   const variable = $('gbVariable');
   const xField = $('gbX');
@@ -302,6 +302,7 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate }) {
   dialog.addEventListener('click', event => {
     const candidate = event.target.closest('[data-graph]');
     if (candidate) {
+      if (candidate.dataset.graph === 'box') { dialog.close(); onBoxplot(); return; }
       active = candidate.dataset.graph;
       canvas.scrollTop = 0;
       render();
