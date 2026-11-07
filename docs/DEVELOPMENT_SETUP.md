@@ -4,7 +4,9 @@ This is jmptab's adaptation of the RecruitmentAssistant workflow. Its statistica
 
 ## Roles and flow
 
-The owner chooses scope and release timing. Lead keeps task cards current. Product defines acceptance criteria. Architect checks design against existing code. Developer implements and tests. UX reviews user-facing flows. Tester runs the full suite and checks the browser. Security reviews storage, imports, network and deployment. Maintainer updates version, changelog and deployment instructions.
+The owner chooses scope and release timing. Lead keeps task cards current. Product defines acceptance criteria. Architect checks design against existing code. Developer implements application code. UX reviews user-facing flows. Tester adds and maintains regression tests, runs the full suite and checks the browser. Security reviews storage, imports, network and deployment. Maintainer updates version, changelog and deployment instructions.
+
+The tester may create or modify files only in `tests/tester/`, separate from application code and existing developer-owned tests. When a test exposes a defect or needs a new test hook, the tester reports it to the developer; the developer changes the application. Both test commands run tester-owned tests alongside the existing suite.
 
 For a substantial new request, record the requirement and plan in a `waiting` card. Approval moves it to `approved`. Implement, test and move the card through `in_progress` to `done`. Release preparation includes an `X.Y.Z` version, changelog and a full test run. Deployment is a separate release decision; the owner must request it for that release. Approval of a plan does not deploy code.
 

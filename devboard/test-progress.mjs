@@ -4,7 +4,9 @@ import { writeJson } from './state.mjs';
 
 const state = { status: 'running', startedAt: new Date().toISOString(), done: 0, total: null, failures: 0, current: '' };
 writeJson('tests.json', state);
-const files = readdirSync('tests').filter((name) => name.endsWith('.test.mjs')).map((name) => `tests/${name}`);
+const files = ['tests', 'tests/tester'].flatMap((directory) =>
+  readdirSync(directory).filter((name) => name.endsWith('.test.mjs')).map((name) => `${directory}/${name}`)
+);
 const child = spawn(process.execPath, ['--test', '--test-reporter=tap', ...files], { stdio: ['inherit', 'pipe', 'inherit'] });
 let pending = '';
 child.stdout.on('data', (data) => {

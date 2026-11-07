@@ -6,4 +6,6 @@ For protected files (`server.mjs`, devboard state/guard/server logic, deployment
 
 Run `npm run test:tracked` for work that changes behavior. Before a release, update `package.json` and `CHANGELOG.md`, run the full tests, and show exact deployment commands. Deploy only when the owner requests it for that release.
 
+The tester is responsible for adding and maintaining regression tests. In the tester role, create or edit files only under `tests/tester/`; do not edit application code or the other test directories. Report defects and missing test hooks to the developer. The developer fixes application code. Both `npm test` and `npm run test:tracked` include the tester directory.
+
 The `.claude/settings.json` hooks apply to Claude Code. Codex does not load that file automatically; follow the same workflow instructions here and use `node devboard/hook.mjs pre` or `post` with a JSON tool event when checking the guard manually.

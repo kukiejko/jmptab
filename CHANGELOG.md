@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.26 — 2026-11-07
+
+- Tester now owns regression tests in `tests/tester/`; both test commands include them. Added a sparse worksheet test at the combined row and column limits.
+
 ## 0.1.25 — 2026-11-07
 
 - Help menu now shows the program version and local rollout time, with a Changes submenu populated from the changelog.
