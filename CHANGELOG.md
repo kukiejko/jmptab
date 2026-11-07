@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.21 — 2026-11-07
+
+- Sample data now creates and opens a new worksheet, preserving the current worksheet and its results.
+
 ## 0.1.20 — 2026-11-07
 
 - Added normal, uniform, exponential, and bimodal choices to the sample data generator. Normal data defaults to mean 0 and sigma 1, and can include a configurable percentage of outliers.

@@ -1,6 +1,7 @@
 import { setupGraphBuilder } from './graph-builder.js';
 import { setupBoxplotBuilder } from './boxplot-builder.js';
 import { setupSampleDataDialog } from './sample-data-dialog.js';
+import { appendSampleWorksheet } from './sample-worksheet.js';
 import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
@@ -533,26 +534,16 @@ $('file').onchange = async event => {
     $('file').value = '';
   }
 };
-const openSampleDataDialog = setupSampleDataDialog({ onGenerate: (next, type) => {
-  if (unsaved && !confirm('Replace your worksheet with sample data? Export or save first to keep your work.')) return false;
-  data = next;
-  activeSheet().data = data;
-  activeSheet().page = 1;
-  activeSheet().scrollLeft = 0;
-  page = 1;
-  history = history.filter(result => result.sheetName !== activeSheet().name);
+const openSampleDataDialog = setupSampleDataDialog({ onGenerate: next => {
+  const appended = appendSampleWorksheet(worksheets, next);
+  worksheets = appended.worksheets;
+  switchSheet(appended.activeSheetIndex);
   activeResult = null;
   revision++;
-  unsaved = true;
-  invalidateReport();
-  renderSheet();
-  renderHistory();
   $('analysis').value = 'summary';
   $('response').value = '0';
   $('predictor').value = '1';
   updateSettings();
-  $('projectName').textContent = `Sample ${type}`;
-  $('saveState').textContent = 'Unsaved changes';
   run();
   return true;
 } });
