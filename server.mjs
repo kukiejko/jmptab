@@ -2,6 +2,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseReleaseNotes } from './release-notes.mjs';
 
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 const distRoot = path.join(projectRoot, 'dist');
@@ -47,6 +48,13 @@ export function createRequestHandler({ deployedAt = new Date().toISOString() } =
       return;
     }
 
+    if (requestPath === '/release-notes.json') {
+      const markdown = fs.readFileSync(path.join(projectRoot, 'CHANGELOG.md'), 'utf8');
+      response.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      response.end(JSON.stringify(parseReleaseNotes(markdown)));
+      return;
+    }
+
     serveFile(requestPath, response);
   };
 }
@@ -56,7 +64,9 @@ export function createServer(options) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  createServer().listen(4173, '127.0.0.1', () => {
-    console.log('Local: http://127.0.0.1:4173');
+  const port = Number(process.argv[2] || 4173);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
+  createServer().listen(port, '127.0.0.1', () => {
+    console.log(`Local: http://127.0.0.1:${port}`);
   });
 }

@@ -595,7 +595,7 @@ $('saveBtn').onclick = async () => {
   }
 };
 const analysisDialog = $('analysisDialog');
-const menus = [...document.querySelectorAll('.menubar details')];
+const menus = [...document.querySelectorAll('.menubar > details')];
 const analysisFields = ['analysis', 'response', 'predictor', 'lsl', 'usl', 'pSize', 'pTarget', 'xbarSize', 'xbarTarget', 'xbarSigma', 'maSpan', 'esWeight', 'esInitial', 'tSource', 'tN', 'tMean', 'tSd', 'tConfidence', 'tAlternative', 'tNull'];
 let analysisDraft;
 
@@ -622,7 +622,7 @@ const viewActions = {
 document.querySelector('.menubar').addEventListener('click', event => {
   const summary = event.target.closest('summary');
   if (summary) {
-    closeMenus(summary.parentElement);
+    closeMenus(summary.closest('.menubar > details'));
     return;
   }
 
@@ -714,24 +714,53 @@ $('historyList').onclick = event => {
   }
 };
 
-$('helpBtn').onclick = async () => {
-  $('help').showModal();
+function formatRolloutTime(deployedAt) {
+  const date = new Date(deployedAt);
+  if (!Number.isFinite(date.getTime())) throw Error('App information is invalid.');
+  return date.toLocaleString(undefined, {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
+  });
+}
+
+async function loadReleaseInfo() {
   try {
-    const response = await fetch('/app-info.json', { cache: 'no-store' });
-    if (!response.ok) throw Error('App information is unavailable.');
-    const { version, deployedAt } = await response.json();
-    const date = new Date(deployedAt);
-    if (!version || !Number.isFinite(date.getTime())) throw Error('App information is invalid.');
+    const [infoResponse, notesResponse] = await Promise.all([
+      fetch('/app-info.json', { cache: 'no-store' }),
+      fetch('/release-notes.json', { cache: 'no-store' })
+    ]);
+    if (!infoResponse.ok || !notesResponse.ok) throw Error('Release information is unavailable.');
+    const { version, deployedAt } = await infoResponse.json();
+    const notes = await notesResponse.json();
+    if (!version || !Array.isArray(notes)) throw Error('Release information is invalid.');
+    const rolloutTime = formatRolloutTime(deployedAt);
     $('appVersion').textContent = version;
-    $('deploymentTime').textContent = date.toLocaleString(undefined, {
-      year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
-    });
+    $('deploymentTime').textContent = rolloutTime;
+    $('helpMenuVersion').textContent = version;
+    $('helpMenuRollout').textContent = rolloutTime;
+    const list = $('helpChangesList');
+    list.replaceChildren();
+    for (const release of notes) {
+      const heading = document.createElement('h3');
+      heading.textContent = `Version ${release.version}`;
+      const changes = document.createElement('ul');
+      for (const change of release.changes) {
+        const item = document.createElement('li');
+        item.textContent = change;
+        changes.append(item);
+      }
+      list.append(heading, changes);
+    }
   } catch {
     $('appVersion').textContent = 'Unavailable';
     $('deploymentTime').textContent = 'Unavailable';
+    $('helpMenuVersion').textContent = 'Unavailable';
+    $('helpMenuRollout').textContent = 'Unavailable';
+    $('helpChangesList').textContent = 'Changes unavailable.';
   }
-};
+}
+$('helpMenu').addEventListener('toggle', () => { if ($('helpMenu').open) loadReleaseInfo(); });
+$('helpBtn').onclick = () => { $('help').showModal(); loadReleaseInfo(); };
 $('closeHelp').onclick = () => $('help').close();
 function addGraphResult(graph) {
   const html = `<div class="result-title"><div><h3>${esc(graph.title)}</h3><p>${esc(graph.label)} · ${esc(activeSheet().name)}</p></div>

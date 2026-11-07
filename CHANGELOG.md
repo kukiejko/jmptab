@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.25 — 2026-11-07
+
+- Help menu now shows the program version and local rollout time, with a Changes submenu populated from the changelog.
+
 ## 0.1.24 — 2026-11-07
 
 - Normal sample generation now uses mean and sigma without minimum or maximum fields or clipping; the other distributions retain range controls.

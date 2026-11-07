@@ -11,6 +11,7 @@ npm start
 ```
 
 Open http://127.0.0.1:4173. Use Stat or Graph to open an analysis dialog, then select a result in the Navigator to revisit it. Run `npm test` for calculation and import tests.
+If port 4173 is in use, run `npm start -- 4174` and open http://127.0.0.1:4174 instead.
 
 Choose **Graph → Boxplot** or select Boxplot in Graph Builder. Pick one of four layouts, choose numeric Y columns and up to four categorical grouping columns, then use **Scale**, **Labels**, **Data View**, **Multiple Graphs**, and **Data Options** for axes, annotations, visual layers, paneling, and a temporary row filter. Generate adds the chart to session results. Hover or focus a box for quartiles, IQR, whiskers, and sample size; hover an outlier star for its value.
 
@@ -46,7 +47,7 @@ Right-click a column header to insert a column on either side, move it left or r
 - `dist/app.js` reads dialog fields and manages worksheet UI and history. Keep calculations and result formatting in the independent modules so they can be tested without a browser.
 - `server.mjs` exports `createRequestHandler` and `createServer`. `tests/server.test.mjs` checks the metadata and static responses without opening a network port.
 
-Run `npm test` after changing calculations or analysis wiring. The Help dialog displays the package version and the local server start time from `/app-info.json`.
+Run `npm test` after changing calculations or analysis wiring. The Help menu and dialog display the package version and local server start time from `/app-info.json`; the Changes submenu reads recent entries from `CHANGELOG.md`.
 See [CHANGELOG.md](CHANGELOG.md) for version history and deployment time semantics.
 For development tasks, approvals, pause control and tracked test progress, see [Development setup](docs/DEVELOPMENT_SETUP.md). Run `npm run devboard` to open the local dashboard on port 8765.
 

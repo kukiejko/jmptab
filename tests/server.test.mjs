@@ -25,9 +25,16 @@ test('server exposes deployment metadata and serves the app', async () => {
   const { version } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
   assert.deepEqual(JSON.parse(info.body), { version, deployedAt });
 
+  const notes = await request(handler, '/release-notes.json');
+  assert.equal(notes.status, 200);
+  assert.equal(notes.headers['Cache-Control'], 'no-store');
+  assert.equal(JSON.parse(notes.body)[0].version, version);
+  assert.ok(JSON.parse(notes.body)[0].changes.length > 0);
+
   const page = await request(handler, '/');
   assert.equal(page.status, 200);
   assert.match(page.body, /id="appVersion"/);
+  assert.match(page.body, /id="helpMenuVersion"/);
 
   assert.equal((await request(handler, '/missing.txt')).status, 404);
   assert.equal((await request(handler, '/%ZZ')).status, 400);
