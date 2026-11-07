@@ -16,7 +16,7 @@ for (const type of Object.keys(SAMPLE_DEFAULTS)) {
 
 test('sample settings reject counts, ranges, and groups outside limits', () => {
   for (const settings of [
-    { type: 'histogram', count: 1 }, { type: 'histogram', count: 100001 },
+    { type: 'histogram', count: 1 }, { type: 'histogram', count: 1_048_577 },
     { type: 'boxplot', min: 5, max: 5 }, { type: 'boxplot', groups: 9 },
     { type: 'scatterplot', yMin: 10, yMax: 2 },
     { type: 'histogram', distribution: 'normal', sigma: 0 },

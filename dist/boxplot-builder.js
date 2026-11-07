@@ -59,7 +59,14 @@ export function setupBoxplotBuilder({ getData, onCreate, escape }) {
   let preview;
   let lastError = '';
   const selected = field => [...field.selectedOptions].map(option => Number(option.value));
-  const numericColumns = () => data.headers.map((_, index) => index).filter(index => data.rows.some(row => numeric(row[index]) !== null));
+  const numericColumns = () => {
+    const found = new Set();
+    for (const row of data.rows) for (const key of Object.keys(row)) {
+      const index = Number(key);
+      if (index < data.headers.length && numeric(row[index]) !== null) found.add(index);
+    }
+    return [...found].sort((a, b) => a - b);
+  };
   const options = () => ({
     layout, yColumns: selected($('bpY')), groupColumns: layout.endsWith('groups') ? selected($('bpGroups')) : [],
     panelColumn: $('bpPanel').value === '' ? null : Number($('bpPanel').value),

@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.22 — 2026-11-07
+
+- Increased per-worksheet limits to 1,048,576 rows and 16,384 columns. Wide worksheets render 40 columns at a time and retain empty trailing cells sparsely.
+
 ## 0.1.21 — 2026-11-07
 
 - Sample data now creates and opens a new worksheet, preserving the current worksheet and its results.

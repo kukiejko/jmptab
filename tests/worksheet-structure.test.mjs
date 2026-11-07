@@ -36,3 +36,11 @@ test('copying a column includes its name and every row, including blanks', () =>
   const data = { headers: ['A', 'B'], rows: [['1', 'x'], ['', 'y'], ['3', 'z']] };
   assert.equal(columnClipboardText(data, 0), 'A\n1\n\n3');
 });
+
+test('moving a distant column keeps blank rows sparse', () => {
+  const data = { headers: Array.from({ length: 16_384 }, (_, index) => `C${index + 1}`), rows: [[], ['first']] };
+  moveColumn(data, 0, 16_383);
+  assert.equal(data.rows[0].length, 0);
+  assert.equal(data.rows[1][16_383], 'first');
+  assert.equal(data.rows[1].filter(Boolean).length, 1);
+});

@@ -125,19 +125,21 @@ export function createResizableLayout({ workbench, navigator, navHandle, panes, 
     if (columnWidths.length > count) columnWidths = columnWidths.slice(0, count);
     return columnWidths;
   }
-  function applyColumnWidths() {
+  function applyColumnWidths(first = 0, last = columnWidths.length) {
     const columns = table.querySelectorAll('col');
-    if (columns.length !== columnWidths.length + 1) return;
+    if (columns.length !== last - first + 1) return;
     columns[0].style.width = `${ROW_NUMBER_WIDTH}px`;
-    columnWidths.forEach((width, index) => {
-      columns[index + 1].style.width = `${width}px`;
+    for (let index = first; index < last; index++) {
+      const width = columnWidths[index];
+      columns[index - first + 1].style.width = `${width}px`;
       table.querySelector(`[data-resize-column="${index}"]`)?.setAttribute('aria-valuenow', width);
-    });
-    table.style.width = `${ROW_NUMBER_WIDTH + columnWidths.reduce((sum, width) => sum + width, 0)}px`;
+    }
+    table.style.width = `${ROW_NUMBER_WIDTH + columnWidths.slice(first, last).reduce((sum, width) => sum + width, 0)}px`;
   }
   function setColumnWidth(index, width, persist = true) {
     columnWidths[index] = Math.round(clamp(width, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH));
-    applyColumnWidths();
+    const visible = table.querySelectorAll('[data-resize-column]');
+    applyColumnWidths(Number(visible[0]?.dataset.resizeColumn) || 0, (Number(visible[visible.length - 1]?.dataset.resizeColumn) || 0) + 1);
     if (persist) storage.set('columnWidths', columnWidths);
   }
 

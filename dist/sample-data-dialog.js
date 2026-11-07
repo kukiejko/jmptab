@@ -8,7 +8,7 @@ export function setupSampleDataDialog({ onGenerate }) {
         <div class="sample-data-fields">
           <label for="sampleType">Data for</label><select id="sampleType" name="type"><option value="boxplot">Boxplot</option><option value="scatterplot">Scatterplot</option><option value="histogram">Histogram</option></select>
           <label for="sampleDistribution">Distribution</label><select id="sampleDistribution" name="distribution"><option value="normal">Normal</option><option value="uniform">Uniform</option><option value="exponential">Exponential</option><option value="bimodal">Bimodal</option></select>
-          <label for="sampleCount">Number of points</label><input id="sampleCount" name="count" type="number" min="2" max="100000" step="1" required>
+          <label for="sampleCount">Number of points</label><input id="sampleCount" name="count" type="number" min="2" max="1048576" step="1" required>
           <label for="sampleMin" id="sampleMinLabel">Value minimum</label><input id="sampleMin" name="min" type="number" step="any" required>
           <label for="sampleMax" id="sampleMaxLabel">Value maximum</label><input id="sampleMax" name="max" type="number" step="any" required>
           <label for="sampleYMin" class="scatter-only">Y minimum</label><input id="sampleYMin" class="scatter-only" name="yMin" type="number" step="any">

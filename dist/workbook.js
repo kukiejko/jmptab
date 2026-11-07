@@ -32,5 +32,5 @@ export function validWorksheet(sheet) {
     Array.isArray(data?.headers) && data.headers.length > 0 && data.headers.length <= MAX_COLUMNS &&
     (!data.roles || (Array.isArray(data.roles) && data.roles.length === data.headers.length && data.roles.every(role => role === '' || COLUMN_ROLES.includes(role)))) &&
     Array.isArray(data.rows) && data.rows.length <= MAX_ROWS &&
-    data.rows.every(row => Array.isArray(row) && row.length === data.headers.length);
+    data.rows.every(row => Array.isArray(row) && row.length <= data.headers.length);
 }

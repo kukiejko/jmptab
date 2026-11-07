@@ -33,7 +33,7 @@ export function recordsToWorksheet(records) {
   const columnByName = new Map();
   const rows = [];
   for (const fields of records) {
-    if (rows.length >= MAX_ROWS) throw Error('Import up to 30 columns and 1,000,000 rows.');
+    if (rows.length >= MAX_ROWS) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
     const row = [];
     const seen = new Set();
     for (const [rawName, rawValue] of fields) {
@@ -42,7 +42,7 @@ export function recordsToWorksheet(records) {
       if (seen.has(name)) throw Error(`XML row has duplicate field “${name}”.`);
       seen.add(name);
       if (!columnByName.has(name)) {
-        if (headers.length >= MAX_COLUMNS) throw Error('Import up to 30 columns and 1,000,000 rows.');
+        if (headers.length >= MAX_COLUMNS) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
         columnByName.set(name, headers.length);
         headers.push(name);
       }
@@ -52,7 +52,7 @@ export function recordsToWorksheet(records) {
   }
   if (!rows.length) throw Error('XML must include at least one data row.');
   if (!headers.length) throw Error('XML rows must contain fields or attributes.');
-  for (const row of rows) {
+  if (headers.length <= 30) for (const row of rows) {
     for (let index = 0; index < headers.length; index++) row[index] ??= '';
   }
   return { headers, rows };
@@ -88,10 +88,10 @@ function spreadsheetCells(row) {
     if (indexed) {
       nextIndex = Number(indexed) - 1;
       if (!Number.isInteger(nextIndex) || nextIndex < 0 || nextIndex >= MAX_COLUMNS) {
-        throw Error('SpreadsheetML cell index must be between 1 and 30.');
+        throw Error('SpreadsheetML cell index must be between 1 and 16,384.');
       }
     }
-    if (nextIndex >= MAX_COLUMNS) throw Error('Import up to 30 columns and 1,000,000 rows.');
+    if (nextIndex >= MAX_COLUMNS) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
     values[nextIndex++] = first(cell, 'Data')?.textContent ?? '';
   }
   return values;
@@ -102,12 +102,12 @@ function spreadsheetToWorksheet(root) {
   const table = worksheet && first(worksheet, 'Table');
   const xmlRows = table ? elements(table, 'Row') : [];
   if (xmlRows.length < 2) throw Error('SpreadsheetML must include a header row and at least one data row.');
-  if (xmlRows.length - 1 > MAX_ROWS) throw Error('Import up to 30 columns and 1,000,000 rows.');
+  if (xmlRows.length - 1 > MAX_ROWS) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
   const cells = xmlRows.map(spreadsheetCells);
   const width = cells.reduce((maximum, row) => Math.max(maximum, row.length), 0);
   if (!width) throw Error('SpreadsheetML rows must contain cells.');
   const headers = Array.from({ length: width }, (_, index) => String(cells[0][index] ?? '').trim() || `Column ${index + 1}`);
-  const rows = cells.slice(1).map(row => Array.from({ length: width }, (_, index) => String(row[index] ?? '')));
+  const rows = cells.slice(1).map(row => width <= 30 ? Array.from({ length: width }, (_, index) => String(row[index] ?? '')) : row);
   return { headers, rows };
 }
 

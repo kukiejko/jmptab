@@ -1,3 +1,5 @@
+import { MAX_ROWS } from './stats.js';
+
 export const SAMPLE_DEFAULTS = Object.freeze({
   boxplot: { count: 120, min: -6, max: 6, groups: 3 },
   scatterplot: { count: 100, min: -6, max: 6, yMin: -6, yMax: 6 },
@@ -20,7 +22,7 @@ export function generateSampleData(input, random = randomSource(4711)) {
   const count = Number(settings.count);
   const min = Number(settings.min);
   const max = Number(settings.max);
-  if (!Number.isInteger(count) || count < 2 || count > 100000) throw new Error('Point count must be a whole number from 2 to 100,000.');
+  if (!Number.isInteger(count) || count < 2 || count > MAX_ROWS) throw new Error('Point count must be a whole number from 2 to 1,048,576.');
   if (!Number.isFinite(min) || !Number.isFinite(max) || min >= max) throw new Error('Minimum must be less than maximum.');
   if (!SAMPLE_DISTRIBUTIONS.includes(settings.distribution)) throw new Error('Choose a distribution.');
   const mean = Number(settings.mean);

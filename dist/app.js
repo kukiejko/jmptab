@@ -2,6 +2,7 @@ import { setupGraphBuilder } from './graph-builder.js';
 import { setupBoxplotBuilder } from './boxplot-builder.js';
 import { setupSampleDataDialog } from './sample-data-dialog.js';
 import { appendSampleWorksheet } from './sample-worksheet.js';
+import { columnWindow, VISIBLE_COLUMNS } from './column-window.js';
 import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
@@ -18,6 +19,7 @@ function sample(){return{headers:['Diameter (mm)','Temperature (°C)','Line'],ro
 let data=sample(),history=[],lastReport='',revision=0,unsaved=false,activeResult=null;const storeKey='statlab-session-v1';
 let worksheets = [{ name: 'Worksheet 1', data, page: 1, scrollLeft: 0 }];
 let activeSheetIndex = 0;
+let columnStart = 0;
 let enterDirection = (() => { try { return localStorage.getItem('jmptab-enter-direction') === 'right' ? 'right' : 'down'; } catch { return 'down'; } })();
 const activeSheet = () => worksheets[activeSheetIndex];
 function invalidateReport(){lastReport='';$('results').innerHTML='<div class="empty">No result for this worksheet. Choose numeric columns and run an analysis.</div>';$('resultSubtitle').textContent='No analysis yet';}
@@ -49,25 +51,25 @@ function renderSheet() {
   page = Math.min(page, pageCount);
   activeSheet().page = page;
   const start = (page - 1) * PAGE_SIZE;
+  const visible = columnWindow(data.headers.length, columnStart);
+  columnStart = visible.first;
   const widths = layout.widthsFor(data.headers.length);
-  const colgroup = '<colgroup><col>' + widths.map(() => '<col>').join('') + '</colgroup>';
-  const headers = data.headers.map((_, index) =>
-    `<th scope="col" data-column-index="${index}" data-selected-column="${activeSheet().selectedColumn === index}" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Select column ${index + 1}; Shift-click to sort" aria-pressed="${activeSheet().selectedColumn === index}" title="Click to select column; Shift-click to sort; right-click for actions">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
-  ).join('');
-  const names = data.headers.map((name, column) =>
-    `<th data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`
-  ).join('');
+  const colgroup = '<colgroup><col>' + widths.slice(visible.first, visible.last).map(() => '<col>').join('') + '</colgroup>';
+  const headers = data.headers.slice(visible.first, visible.last).map((_, offset) => { const index = visible.first + offset; return `<th scope="col" data-column-index="${index}" data-selected-column="${activeSheet().selectedColumn === index}" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Select column ${index + 1}; Shift-click to sort" aria-pressed="${activeSheet().selectedColumn === index}" title="Click to select column; Shift-click to sort; right-click for actions">C${index + 1}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
+  }).join('');
+  const names = data.headers.slice(visible.first, visible.last).map((name, offset) => { const column = visible.first + offset; return `<th data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"></th>`
+  }).join('');
   const rows = data.rows.slice(start, start + PAGE_SIZE).map((row, offset) => {
     const index = start + offset;
-    const cells = row.map((value, column) =>
-      `<td data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input class="${numeric(value) === null ? 'text-value' : 'numeric-value'}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
-    ).join('');
+    const cells = Array.from({ length: visible.last - visible.first }, (_, offset) => { const column = visible.first + offset; const value = row[column] ?? ''; return `<td data-column-index="${column}" data-selected-column="${activeSheet().selectedColumn === column}"><input class="${numeric(value) === null ? 'text-value' : 'numeric-value'}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(value)}"></td>`
+    }).join('');
     const selected = activeSheet().selectedRows?.has(index) || false;
     return `<tr data-selected="${selected}"><td class="row-heading"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button></td>${cells}</tr>`;
   }).join('');
   $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col" class="row-number-heading"><label for="enterDirection">#</label><select id="enterDirection" aria-label="Enter direction" title="Enter moves down or right"><option value="down">↓</option><option value="right">→</option></select></th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
+  if (visible.windowed) $('tableScroll').scrollLeft = 0;
   $('enterDirection').value = enterDirection;
-  layout.applyColumnWidths();
+  layout.applyColumnWidths(visible.first, visible.last);
   $('sheetCount').textContent = `${data.rows.length.toLocaleString('en-US')} rows · ${data.headers.length} columns`;
   $('sheetPage').value = page;
   $('sheetPage').max = pageCount;
@@ -97,6 +99,14 @@ function renderSheetTabs() {
 function updateHorizontalScroll() {
   const viewport = $('tableScroll');
   const slider = $('sheetHorizontalScroll');
+  if (data.headers.length > VISIBLE_COLUMNS) {
+    slider.max = data.headers.length - VISIBLE_COLUMNS;
+    slider.value = columnStart;
+    slider.disabled = false;
+    $('scrollSheetLeft').disabled = columnStart === 0;
+    $('scrollSheetRight').disabled = columnStart >= Number(slider.max);
+    return;
+  }
   const maximum = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
   slider.max = maximum;
   slider.value = Math.min(maximum, viewport.scrollLeft);
@@ -123,11 +133,13 @@ function switchSheet(index) {
   if (index < 0 || index >= worksheets.length || index === activeSheetIndex) return;
   activeSheet().page = page;
   activeSheet().scrollLeft = $('tableScroll').scrollLeft;
+  activeSheet().columnStart = columnStart;
   activeSheetIndex = index;
   data = activeSheet().data;
   page = activeSheet().page || 1;
+  columnStart = activeSheet().columnStart || 0;
   renderSheet();
-  $('tableScroll').scrollLeft = activeSheet().scrollLeft || 0;
+  $('tableScroll').scrollLeft = data.headers.length > VISIBLE_COLUMNS ? 0 : activeSheet().scrollLeft || 0;
   updateHorizontalScroll();
   const priorResult = history.find(result => result.sheetName === activeSheet().name);
   if (priorResult) showResult(priorResult);
@@ -196,19 +208,24 @@ $('addSheet').onclick = () => {
 };
 
 $('sheetHorizontalScroll').oninput = event => {
+  if (data.headers.length > VISIBLE_COLUMNS) { columnStart = Number(event.target.value); renderSheet(); return; }
   $('tableScroll').scrollLeft = Number(event.target.value);
 };
 $('scrollSheetLeft').onclick = () => {
+  if (data.headers.length > VISIBLE_COLUMNS) { columnStart = Math.max(0, columnStart - 10); renderSheet(); return; }
   $('tableScroll').scrollLeft -= Math.max(100, $('tableScroll').clientWidth * .75);
 };
 $('scrollSheetRight').onclick = () => {
+  if (data.headers.length > VISIBLE_COLUMNS) { columnStart = Math.min(data.headers.length - VISIBLE_COLUMNS, columnStart + 10); renderSheet(); return; }
   $('tableScroll').scrollLeft += Math.max(100, $('tableScroll').clientWidth * .75);
 };
 $('tableScroll').addEventListener('scroll', updateHorizontalScroll);
 new ResizeObserver(updateHorizontalScroll).observe($('worksheet'));
 new ResizeObserver(updateHorizontalScroll).observe($('tableScroll'));
-function renderColumns(){for(const id of ['response','predictor']){const prev=$(id).value;$(id).innerHTML=data.headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');if(prev!==''&&Number(prev)<data.headers.length)$(id).value=prev;}if($('predictor').value===$('response').value&&data.headers.length>1)$('predictor').value=String((+$('response').value+1)%data.headers.length);}
-$('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined){data.rows[+el.dataset.row][c]=el.value;el.classList.toggle('numeric-value',numeric(el.value)!==null);el.classList.toggle('text-value',numeric(el.value)===null);}else{data.headers[c]=el.value;renderColumns();}dirty();});
+let renderedColumnNames = '';
+function renderColumns(){const names = data.headers.join('\u0000');if(names===renderedColumnNames)return;renderedColumnNames=names;for(const id of ['response','predictor']){const prev=$(id).value;$(id).innerHTML=data.headers.map((h,i)=>`<option value="${i}">${esc(h)}</option>`).join('');if(prev!==''&&Number(prev)<data.headers.length)$(id).value=prev;}if($('predictor').value===$('response').value&&data.headers.length>1)$('predictor').value=String((+$('response').value+1)%data.headers.length);}
+$('worksheet').addEventListener('input',e=>{const el=e.target;if(!el.matches('input'))return;const c=+el.dataset.col;if(el.dataset.row!==undefined){data.rows[+el.dataset.row][c]=el.value;el.classList.toggle('numeric-value',numeric(el.value)!==null);el.classList.toggle('text-value',numeric(el.value)===null);}else data.headers[c]=el.value;dirty();});
+$('worksheet').addEventListener('change', e => { if (e.target.matches('thead input[data-col]')) renderColumns(); });
 const sheetMenu = document.createElement('div');
 sheetMenu.className = 'sheet-context-menu';
 sheetMenu.setAttribute('role', 'menu');
@@ -391,8 +408,12 @@ $('worksheet').addEventListener('keydown', event => {
   } else row++;
   if (row >= MAX_ROWS) return;
   if (row >= data.rows.length) {
-    data.rows.push(Array(data.headers.length).fill(''));
+    data.rows.push(data.headers.length <= 30 ? Array(data.headers.length).fill('') : []);
     dirty();
+  }
+  if (data.headers.length > VISIBLE_COLUMNS && (column < columnStart || column >= columnStart + VISIBLE_COLUMNS)) {
+    columnStart = Math.min(column, data.headers.length - VISIBLE_COLUMNS);
+    renderSheet();
   }
   if (Math.floor(row / PAGE_SIZE) + 1 !== page || row >= data.rows.length - 1) {
     page = Math.floor(row / PAGE_SIZE) + 1;
@@ -400,7 +421,7 @@ $('worksheet').addEventListener('keydown', event => {
   }
   $('worksheet').querySelector(`td input[data-row="${row}"][data-col="${column}"]`)?.focus();
 });
-$('worksheet').addEventListener('paste',e=>{const el=e.target;if(!el.matches('td input'))return;const text=e.clipboardData.getData('text');if(!/[\t\n]/.test(text))return;e.preventDefault();const incoming=text.replace(/\r/g,'').trimEnd().split('\n').map(r=>r.split('\t')),r=+el.dataset.row,c=+el.dataset.col;if(r+incoming.length>MAX_ROWS||c+incoming.reduce((width, row) => Math.max(width, row.length), 0)>30){message('Paste up to 1,000,000 rows and 30 columns.');return;}while(data.headers.length<c+incoming.reduce((width, row) => Math.max(width, row.length), 0))data.headers.push(`Column ${data.headers.length+1}`);if(data.roles)while(data.roles.length<data.headers.length)data.roles.push('');data.rows.forEach(row=>{while(row.length<data.headers.length)row.push('');});while(data.rows.length<r+incoming.length)data.rows.push(Array(data.headers.length).fill(''));incoming.forEach((row,i)=>row.forEach((v,j)=>data.rows[r+i][c+j]=v));dirty();renderSheet();});
+$('worksheet').addEventListener('paste',e=>{const el=e.target;if(!el.matches('td input'))return;const text=e.clipboardData.getData('text');if(!/[\t\n]/.test(text))return;e.preventDefault();const incoming=text.replace(/\r/g,'').trimEnd().split('\n').map(r=>r.split('\t')),r=+el.dataset.row,c=+el.dataset.col;if(r+incoming.length>MAX_ROWS||c+incoming.reduce((width, row) => Math.max(width, row.length), 0)>MAX_COLUMNS){message('Paste up to 1,048,576 rows and 16,384 columns.');return;}while(data.headers.length<c+incoming.reduce((width, row) => Math.max(width, row.length), 0))data.headers.push(`Column ${data.headers.length+1}`);if(data.roles)while(data.roles.length<data.headers.length)data.roles.push('');while(data.rows.length<r+incoming.length)data.rows.push(data.headers.length <= 30 ? Array(data.headers.length).fill('') : []);incoming.forEach((row,i)=>row.forEach((v,j)=>data.rows[r+i][c+j]=v));dirty();renderSheet();});
 function updateSettings(){const type=$('analysis').value;$('predictorField').hidden=type!=='regression'&&type!=='correlation';document.querySelectorAll('.spec').forEach(el=>el.hidden=type!=='capability');$('pFields').hidden=type!=='p-chart';$('xbarFields').hidden=type!=='xbar-chart';$('maFields').hidden=type!=='moving-average';$('esFields').hidden=type!=='exponential-smoothing';$('tFields').hidden=type!=='one-sample-t';$('responseField').hidden=type==='one-sample-t'&&$('tSource').value==='summary';$('tSummaryFields').hidden=$('tSource').value!=='summary';$('tNullField').hidden=!$('tTest').checked;}
 $('analysis').onchange=updateSettings;
 $('tSource').onchange=updateSettings;
@@ -502,7 +523,7 @@ function renderHistory() {
     : '<p class="empty">Run an analysis to add a result.</p>';
 }
 
-$('addRow').onclick=()=>{if(data.rows.length>=MAX_ROWS)return message('Maximum 1,000,000 rows.');data.rows.push(Array(data.headers.length).fill(''));dirty();showPage(Math.ceil(data.rows.length / PAGE_SIZE));const scroll=document.querySelector('.table-scroll');scroll.scrollTop=scroll.scrollHeight;};$('addCol').onclick=()=>{if(data.headers.length>=30)return message('Maximum 30 columns.');data.headers.push(`Column ${data.headers.length+1}`);data.roles?.push('');data.rows.forEach(r=>r.push(''));dirty();renderSheet();};
+$('addRow').onclick=()=>{if(data.rows.length>=MAX_ROWS)return message('Maximum 1,048,576 rows.');data.rows.push(data.headers.length <= 30 ? Array(data.headers.length).fill('') : []);dirty();showPage(Math.ceil(data.rows.length / PAGE_SIZE));const scroll=document.querySelector('.table-scroll');scroll.scrollTop=scroll.scrollHeight;};$('addCol').onclick=()=>{if(data.headers.length>=MAX_COLUMNS)return message('Maximum 16,384 columns.');data.headers.push(`Column ${data.headers.length+1}`);data.roles?.push('');dirty();renderSheet();};
 function download(name,content,type){const url=URL.createObjectURL(new Blob(typeof content === "string" ? [content] : content,{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('exportBtn').onclick=()=>download('worksheet.csv',csvChunks(data),'text/csv;charset=utf-8');$('reportBtn').onclick=()=>lastReport?download('jmptab-report.txt',lastReport,'text/plain;charset=utf-8'):message('Run an analysis before exporting a report.');
 $('importBtn').onclick = () => $('file').click();

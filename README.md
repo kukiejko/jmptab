@@ -53,7 +53,7 @@ See [CHANGELOG.md](CHANGELOG.md) for version history and deployment time semanti
 
 - Editable worksheet with named columns and spreadsheet tab/newline paste
 - Multiple worksheets with tab navigation and horizontal scrolling
-- CSV and XML import for up to 1,000,000 data rows and 30 columns, subject to available browser memory; CSV export
+- Up to 1,048,576 rows and 16,384 columns per worksheet, subject to available browser memory and storage. Wide worksheets show 40 columns at a time; use the horizontal control to move across the sheet. CSV and XML import and CSV export use the same limits.
 - Worksheet navigation in 200-row pages. Enter a page number and select Go to jump directly.
 - Descriptive statistics and histogram
 - One-sample t confidence intervals and hypothesis tests from a worksheet column or summary statistics

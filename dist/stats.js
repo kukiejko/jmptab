@@ -1,5 +1,5 @@
-export const MAX_ROWS = 1_000_000;
-export const MAX_COLUMNS = 30;
+export const MAX_ROWS = 1_048_576;
+export const MAX_COLUMNS = 16_384;
 
 export function numeric(v){if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(v);return Number.isFinite(n)?n:null;}
 export function summary(values){const a=values.map(numeric).filter(v=>v!==null);if(a.length<2)throw Error('Select a column with at least two numeric observations.');const sorted=[...a].sort((a,b)=>a-b),n=a.length,mean=a.reduce((s,x)=>s+x,0)/n;const variance=a.reduce((s,x)=>s+(x-mean)**2,0)/(n-1);const q=p=>{const k=(n-1)*p,i=Math.floor(k);return sorted[i]+(sorted[Math.ceil(k)]-sorted[i])*(k-i);};return {n,missing:values.length-n,mean,sd:Math.sqrt(variance),variance,min:sorted[0],q1:q(.25),median:q(.5),q3:q(.75),max:sorted[n-1],se:Math.sqrt(variance/n),values:a};}
@@ -127,12 +127,13 @@ export function pChart(counts, subgroupSize, target = null) {
   return { n: parsed.length, subgroupSize, target, center, lcl, ucl, signals, proportions };
 }
 export function histogram(values){const s=summary(values),k=Math.min(20,Math.ceil(Math.sqrt(s.n))),width=(s.max-s.min||1)/k,bins=Array(k).fill(0);s.values.forEach(v=>bins[Math.min(k-1,Math.floor((v-s.min)/width))]++);return{...s,bins,width};}
-export function parseCSV(text){text=text.replace(/^\uFEFF/,'');const rows=[];let row=[],field='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else if(!quoted&&field!=='')throw Error('Unexpected quote in CSV.');else quoted=!quoted;}else if(c===','&&!quoted){row.push(field);field='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if (row.length > 1 || row[0] !== '') rows.push(row);row=[];field='';}else field+=c;}if(quoted)throw Error('CSV has an unclosed quoted field.');row.push(field);if (row.length > 1 || row[0] !== '') rows.push(row);if(rows.length<2)throw Error('CSV must include a header and at least one data row.');const headers=rows.shift().map((v,i)=>v.trim()||`Column ${i+1}`);if(headers.length>MAX_COLUMNS||rows.length>MAX_ROWS)throw Error('Import up to 30 columns and 1,000,000 rows.');if(rows.some(r=>r.length!==headers.length))throw Error('Each CSV row must have the same number of fields as the header.');return{headers,rows};}
+export function parseCSV(text){text=text.replace(/^\uFEFF/,'');const rows=[];let row=[],field='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else if(!quoted&&field!=='')throw Error('Unexpected quote in CSV.');else quoted=!quoted;}else if(c===','&&!quoted){row.push(field);field='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if (row.length > 1 || row[0] !== '') rows.push(row);row=[];field='';}else field+=c;}if(quoted)throw Error('CSV has an unclosed quoted field.');row.push(field);if (row.length > 1 || row[0] !== '') rows.push(row);if(rows.length<2)throw Error('CSV must include a header and at least one data row.');const headers=rows.shift().map((v,i)=>v.trim()||`Column ${i+1}`);if(headers.length>MAX_COLUMNS||rows.length>MAX_ROWS)throw Error('Import up to 16,384 columns and 1,048,576 rows.');if(rows.some(r=>r.length!==headers.length))throw Error('Each CSV row must have the same number of fields as the header.');return{headers,rows};}
 export function* csvChunks(data, rowsPerChunk = 5_000) {
-  const encodeRow = row => row.map(value => '"' + String(value).replaceAll('"', '""') + '"').join(',');
+  const encodeRow = row => Array.from({ length: data.headers.length }, (_, index) => '"' + String(row[index] ?? '').replaceAll('"', '""') + '"').join(',');
   yield encodeRow(data.headers);
-  for (let start = 0; start < data.rows.length; start += rowsPerChunk) {
-    yield '\r\n' + data.rows.slice(start, start + rowsPerChunk).map(encodeRow).join('\r\n');
+  const chunkRows = Math.max(1, Math.min(rowsPerChunk, Math.floor(100_000 / data.headers.length)));
+  for (let start = 0; start < data.rows.length; start += chunkRows) {
+    yield '\r\n' + data.rows.slice(start, start + chunkRows).map(encodeRow).join('\r\n');
   }
 }
 

@@ -26,7 +26,7 @@ test('XML records align reordered and missing fields across rows', () => {
     rows: [['10', 'A', ''], ['11', 'B', '21']]
   });
   assert.throws(() => recordsToWorksheet([[['A', '1'], ['A', '2']]]), /duplicate field/);
-  assert.throws(() => recordsToWorksheet([Array.from({ length: 31 }, (_, index) => [`C${index}`, 'x'])]), /30 columns/);
+  assert.throws(() => recordsToWorksheet([Array.from({ length: 16_385 }, (_, index) => [`C${index}`, 'x'])]), /16,384 columns/);
 });
 
 test('row-based XML maps named child fields and attributes', () => {
