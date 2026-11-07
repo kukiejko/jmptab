@@ -49,5 +49,7 @@ export function createDevboardServer({ directory = stateDir, tagRestore } = {}) 
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  createDevboardServer().listen(8765, '127.0.0.1', () => console.log('Devboard: http://127.0.0.1:8765'));
+  const port = Number(process.argv[2] || 8765);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be 1–65535');
+  createDevboardServer().listen(port, '127.0.0.1', () => console.log(`Devboard: http://127.0.0.1:${port}`));
 }

@@ -19,6 +19,7 @@ npm run devboard
 ```
 
 Open http://127.0.0.1:8765. The dashboard binds to localhost, refreshes every three seconds and shows work state, tasks, tracked tests and the last 60 events. Pause/resume and task decisions are available there. The dashboard never commits or deploys.
+If another project uses port 8765, run `npm run devboard -- 8766` and open http://127.0.0.1:8766 instead.
 
 Create a task with a lowercase, dash-separated ID:
 
