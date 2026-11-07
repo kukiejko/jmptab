@@ -207,6 +207,7 @@ export function setupBoxplotBuilder({ getData, onCreate, escape }) {
     if (button) event.dataTransfer.setData('text/plain', button.dataset.bpColumn);
   });
   const tooltip = $('bpTooltip');
+  let pinnedTarget = null;
   const showTooltip = (target, x, y) => {
     if (!target) { tooltip.hidden = true; return; }
     tooltip.textContent = target.dataset.boxTooltip;
@@ -214,12 +215,33 @@ export function setupBoxplotBuilder({ getData, onCreate, escape }) {
     tooltip.style.left = `${Math.max(8, Math.min(x + 12, innerWidth - tooltip.offsetWidth - 8))}px`;
     tooltip.style.top = `${Math.max(8, Math.min(y + 12, innerHeight - tooltip.offsetHeight - 8))}px`;
   };
-  document.addEventListener('pointermove', event => showTooltip(event.target.closest('[data-box-tooltip]'), event.clientX, event.clientY));
+  document.addEventListener('pointermove', event => {
+    if (!pinnedTarget) showTooltip(event.target.closest('[data-box-tooltip]'), event.clientX, event.clientY);
+  });
+  document.addEventListener('click', event => {
+    const target = event.target.closest('[data-box-tooltip]');
+    if (target) {
+      pinnedTarget = target;
+      showTooltip(target, event.clientX, event.clientY);
+    } else if (pinnedTarget) {
+      pinnedTarget = null;
+      tooltip.hidden = true;
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && pinnedTarget) { pinnedTarget = null; tooltip.hidden = true; }
+    if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[data-box-tooltip]')) {
+      pinnedTarget = event.target;
+      const rect = event.target.getBoundingClientRect();
+      showTooltip(pinnedTarget, rect.left, rect.bottom);
+      event.preventDefault();
+    }
+  });
   document.addEventListener('focusin', event => {
     const target = event.target.closest('[data-box-tooltip]');
     if (target) { const rect = target.getBoundingClientRect(); showTooltip(target, rect.left, rect.top); }
   });
-  document.addEventListener('focusout', event => { if (event.target.closest('[data-box-tooltip]')) tooltip.hidden = true; });
-  dialog.addEventListener('close', () => { tooltip.hidden = true; preview = null; data = undefined; });
+  document.addEventListener('focusout', event => { if (!pinnedTarget && event.target.closest('[data-box-tooltip]')) tooltip.hidden = true; });
+  dialog.addEventListener('close', () => { pinnedTarget = null; tooltip.hidden = true; preview = null; data = undefined; });
   return open;
 }

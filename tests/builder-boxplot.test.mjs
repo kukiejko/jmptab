@@ -41,7 +41,7 @@ test('boxplot SVG includes box and outlier hover statistics and optional layers'
   assert.match(svg, /Value: 40/);
   assert.match(svg, /boxplot-outlier/);
   assert.match(svg, /stroke-dasharray/);
-  assert.ok(svg.indexOf('data-box-tooltip="Quartile') < svg.indexOf('class="boxplot-outlier"'));
+  assert.ok(svg.indexOf('data-box-tooltip="Group:') < svg.indexOf('class="boxplot-outlier"'));
   const horizontal = drawBoxplot(result, { view: { outliers: true }, scale: { transpose: true } }, value => String(value));
   assert.match(horizontal, /Horizontal boxplot/);
   assert.doesNotMatch(horizontal, /rotate\(90deg\)/);

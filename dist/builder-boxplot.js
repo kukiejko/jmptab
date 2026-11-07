@@ -128,7 +128,7 @@ function drawHorizontalBoxplot(result, options, escape, view, scale) {
       if (view.confidence) parts.push(`<rect x="${xFor(box.ciLow)}" y="${y - 14}" width="${Math.max(1, xFor(box.ciHigh) - xFor(box.ciLow))}" height="28" fill="none" stroke="#154a80" stroke-dasharray="3 2"/>`);
       if (view.median) parts.push(`<line x1="${median}" y1="${y - 22}" x2="${median}" y2="${y + 22}" stroke="#143d6b" stroke-width="2"/>`);
       if (view.mean) parts.push(`<circle cx="${xFor(box.mean)}" cy="${y}" r="4" fill="#d5573b"/>`);
-      const tooltip = `Quartile 1: ${format(box.q1)}\nMedian: ${format(box.median)}\nQuartile 3: ${format(box.q3)}\nInterquartile Range (IQR): ${format(box.iqr)}\nWhiskers: ${format(box.whiskerLow)}, ${format(box.whiskerHigh)}\nN: ${box.n}`;
+      const tooltip = `Group: ${box.label}\nQuartile 1: ${format(box.q1)}\nMedian: ${format(box.median)}\nQuartile 3: ${format(box.q3)}\nInterquartile Range (IQR): ${format(box.iqr)}\nWhiskers: ${format(box.whiskerLow)}, ${format(box.whiskerHigh)}\nN: ${box.n}`;
       parts.push(`<rect x="${Math.min(q1, q3) - 5}" y="${y - 25}" width="${Math.max(12, Math.abs(q3 - q1) + 10)}" height="50" fill="transparent" tabindex="0" data-box-tooltip="${escape(tooltip).replaceAll('\n', '&#10;')}"/>`);
       if (view.outliers) box.outliers.forEach((value, point) => parts.push(`<text class="boxplot-outlier" x="${xFor(value)}" y="${y + 4 + (point % 3 - 1) * 5}" text-anchor="middle" tabindex="0" data-box-tooltip="Value: ${escape(format(value))}&#10;N: 1">*</text>`));
       if (view.points) box.values.slice(0, 600).forEach((value, point) => parts.push(`<circle cx="${xFor(value)}" cy="${y + ((point * 37) % 31) - 15}" r="2" fill="#5b86bb" opacity=".55"/>`));
@@ -152,7 +152,7 @@ export function drawBoxplot(result, options, escape) {
   const references = scale.referenceLines.filter(value => Number.isFinite(value) && (scale.type === 'linear' || value > 0));
   const { low, high, span } = valueBounds(result, axis, references);
   const mapValue = value => 350 - (axis(value) - low) / span * 275;
-  const tooltip = box => `Quartile 1: ${format(box.q1)}\nMedian: ${format(box.median)}\nQuartile 3: ${format(box.q3)}\nInterquartile Range (IQR): ${format(box.iqr)}\nWhiskers: ${format(box.whiskerLow)}, ${format(box.whiskerHigh)}\nN: ${box.n}`;
+  const tooltip = box => `Group: ${box.label}\nQuartile 1: ${format(box.q1)}\nMedian: ${format(box.median)}\nQuartile 3: ${format(box.q3)}\nInterquartile Range (IQR): ${format(box.iqr)}\nWhiskers: ${format(box.whiskerLow)}, ${format(box.whiskerHigh)}\nN: ${box.n}`;
   const panels = result.panels.map(panel => {
     const width = Math.max(680, 110 + panel.boxes.length * 100);
     const xFor = index => 85 + index * 100;
