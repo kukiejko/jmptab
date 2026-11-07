@@ -1,5 +1,6 @@
 import { setupGraphBuilder } from './graph-builder.js';
 import { setupBoxplotBuilder } from './boxplot-builder.js';
+import { setupSampleDataDialog } from './sample-data-dialog.js';
 import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { createResizableLayout } from './layout-resize.js';
@@ -532,9 +533,9 @@ $('file').onchange = async event => {
     $('file').value = '';
   }
 };
-$('sampleBtn').onclick = () => {
-  if (unsaved && !confirm('Replace your worksheet with sample data? Export or save first to keep your work.')) return;
-  data = sample();
+const openSampleDataDialog = setupSampleDataDialog({ onGenerate: (next, type) => {
+  if (unsaved && !confirm('Replace your worksheet with sample data? Export or save first to keep your work.')) return false;
+  data = next;
   activeSheet().data = data;
   activeSheet().page = 1;
   activeSheet().scrollLeft = 0;
@@ -550,10 +551,12 @@ $('sampleBtn').onclick = () => {
   $('response').value = '0';
   $('predictor').value = '1';
   updateSettings();
-  $('projectName').textContent = 'Sample process study';
+  $('projectName').textContent = `Sample ${type}`;
   $('saveState').textContent = 'Unsaved changes';
   run();
-};
+  return true;
+} });
+$('sampleBtn').onclick = openSampleDataDialog;
 $('saveBtn').onclick = async () => {
   const button = $('saveBtn');
   if (button.disabled) return;

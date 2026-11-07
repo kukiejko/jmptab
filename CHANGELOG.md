@@ -2,6 +2,10 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.19 — 2026-11-07
+
+- Sample data now opens a generator for boxplot, scatterplot, or histogram worksheets, with point count and range controls, separate scatterplot X/Y ranges, and boxplot group count.
+
 ## 0.1.18 — 2026-11-07
 
 - Added a dedicated boxplot builder with four data layouts, numeric and categorical column selection, and separate Scale, Labels, Data View, Multiple Graphs, and Data Options dialogs.
