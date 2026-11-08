@@ -42,9 +42,12 @@ export function buildHistogram(data, options) {
         if (panel.series.size >= MAX_SERIES) throw Error('This selection creates more than 16 series in one graph. Choose fewer variables or groups.');
         if (!seriesColors.has(seriesKey)) seriesColors.set(seriesKey, colors[seriesColors.size % colors.length]);
         const label = group === null ? data.headers[column] : overlay ? data.headers[column] + ' · ' + groupValue : groupValue;
-        panel.series.set(seriesKey, { label, color: seriesColors.get(seriesKey), n: 0 });
+        panel.series.set(seriesKey, { label, color: seriesColors.get(seriesKey), n: 0, sum: 0, sumSquares: 0 });
       }
-      panel.series.get(seriesKey).n++;
+      const series = panel.series.get(seriesKey);
+      series.n++;
+      series.sum += value;
+      series.sumSquares += value * value;
       panel.n++;
       panel.min = Math.min(panel.min, value);
       panel.max = Math.max(panel.max, value);
@@ -82,7 +85,13 @@ export function buildHistogram(data, options) {
     let maxHeight = 0;
     for (const series of panel.series) {
       series.heights = series.bins.map(count => percent ? count / series.n * 100 : count);
+      series.mean = series.sum / series.n;
+      series.sd = series.n > 1 ? Math.sqrt(Math.max(0, (series.sumSquares - series.sum * series.sum / series.n) / (series.n - 1))) : 0;
       maxHeight = Math.max(maxHeight, ...series.heights);
+      if (options.normalFit && series.sd > 0) {
+        const binWidth = (panel.max - panel.min) / panel.binCount;
+        maxHeight = Math.max(maxHeight, (percent ? 100 : series.n) * binWidth / (series.sd * Math.sqrt(2*Math.PI)));
+      }
     }
     panel.yMax = Math.max(4, Math.ceil(maxHeight / 4) * 4);
   }
@@ -93,7 +102,7 @@ export function buildHistogram(data, options) {
   return plots;
 }
 
-export function drawHistogram(plots, { percent, legend, escape }) {
+export function drawHistogram(plots, { percent, legend, normalFit = false, escape }) {
   const width = 620;
   const left = 63;
   const chartWidth = 535;
@@ -127,6 +136,16 @@ export function drawHistogram(plots, { percent, legend, escape }) {
         fill="${series.color}" fill-opacity="${panel.series.length > 1 ? '.48' : '.85'}" stroke="${series.color}">
         <title>${escape(series.label)} · ${format(binStart)} to ${format(binEnd)} · ${format(height)}${percent ? '%' : ''}</title></rect>`;
     }).join('')).join('');
+    const curves = normalFit ? panel.series.filter(series => series.sd > 0).map(series => {
+      const binWidth = (panel.max - panel.min) / panel.binCount;
+      const points = Array.from({ length: 101 }, (_, index) => {
+        const xValue = panel.min + (panel.max - panel.min) * index / 100;
+        const z = (xValue - series.mean) / series.sd;
+        const height = (percent ? 100 : series.n) * binWidth * Math.exp(-z*z/2) / (series.sd * Math.sqrt(2*Math.PI));
+        return `${left + chartWidth*index/100},${yPosition(height)}`;
+      }).join(' ');
+      return `<polyline points="${points}" fill="none" stroke="${series.color}" stroke-width="2.4"/>`;
+    }).join('') : '';
     const keys = showLegend ? panel.series.map((series, index) => {
       const x = left + (index % 3) * 179;
       const y = base + 40 + Math.floor(index / 3) * 19;
@@ -135,7 +154,7 @@ export function drawHistogram(plots, { percent, legend, escape }) {
     }).join('') : '';
     const plot = `<g transform="translate(0 ${offset})">
       <text x="${left}" y="20" style="font-size:14px;font-weight:600"><title>${escape(panel.title)}</title>${escape(clip(panel.title, 75))}</text>
-      <text x="${left}" y="36">${percent ? 'Percent' : 'Frequency'}</text>${grid}${bars}${keys}</g>`;
+      <text x="${left}" y="36">${percent ? 'Percent' : 'Frequency'}</text>${grid}${bars}${curves}${keys}</g>`;
     offset += base + 31 + legendHeight;
     return plot;
   }).join('');

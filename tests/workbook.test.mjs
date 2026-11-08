@@ -22,7 +22,7 @@ test('worksheet names are trimmed, unique, and kept in saved data', () => {
 });
 
 test('column roles use the requested labels and survive session serialization', () => {
-  assert.deepEqual(COLUMN_ROLES, ['X1', 'X2', 'Y1', 'Y2', 'Y3', 'Z1', 'Z2', 'Z3', 'G']);
+  assert.deepEqual(COLUMN_ROLES, ['X1', 'X2', 'X3', 'Y1', 'Y2', 'Y3', 'Z1', 'Z2', 'Z3', 'G']);
   const sheet = blankWorksheet('Worksheet 1');
   sheet.data.roles[0] = 'X1';
   sheet.data.roles[1] = 'Y2';

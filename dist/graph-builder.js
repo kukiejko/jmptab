@@ -73,8 +73,9 @@ function barSvg(entries, escape) {
   return `<svg class="chart" viewBox="0 0 600 ${height}" role="img" aria-label="Category frequency bar chart">${bars}</svg>`;
 }
 
-function scatterPoints(rows, xColumn, yColumn) {
+export function scatterPoints(rows, xColumn, yColumn, groupColumn = null) {
   let count = 0;
+  const groupCounts = new Map();
   let xmin = Infinity;
   let xmax = -Infinity;
   let ymin = Infinity;
@@ -82,8 +83,13 @@ function scatterPoints(rows, xColumn, yColumn) {
   for (const row of rows) {
     const x = numeric(row[xColumn]);
     const y = numeric(row[yColumn]);
-    if (x === null || y === null) continue;
+    if (x === null || y === null || (groupColumn !== null && !String(row[groupColumn] ?? '').trim())) continue;
     count++;
+    if (groupColumn !== null) {
+      const name = String(row[groupColumn]);
+      groupCounts.set(name, (groupCounts.get(name) || 0) + 1);
+      if (groupCounts.size > 8) throw Error('Scatterplot supports at most eight groups.');
+    }
     xmin = Math.min(xmin, x);
     xmax = Math.max(xmax, x);
     ymin = Math.min(ymin, y);
@@ -93,14 +99,27 @@ function scatterPoints(rows, xColumn, yColumn) {
   const points = [];
   const take = Math.min(count, POINT_LIMIT);
   let index = 0;
+  const groupSeen = new Map(), groupTaken = new Map();
+  const perGroup = groupColumn === null ? 0 : Math.max(1, Math.floor(POINT_LIMIT/groupCounts.size));
   for (const row of rows) {
     const x = numeric(row[xColumn]);
     const y = numeric(row[yColumn]);
-    if (x === null || y === null) continue;
-    if (index === Math.round(points.length * (count - 1) / Math.max(1, take - 1))) points.push([x, y]);
+    if (x === null || y === null || (groupColumn !== null && !String(row[groupColumn] ?? '').trim())) continue;
+    const name = groupColumn === null ? '' : String(row[groupColumn]);
+    if (groupColumn === null) {
+      if (index === Math.round(points.length * (count - 1) / Math.max(1, take - 1))) points.push([x, y, false, null, name]);
+    } else {
+      const seen = groupSeen.get(name) || 0, taken = groupTaken.get(name) || 0;
+      const quota = Math.min(groupCounts.get(name), perGroup);
+      if (seen === Math.round(taken * (groupCounts.get(name) - 1) / Math.max(1, quota - 1))) {
+        points.push([x, y, false, null, name]);
+        groupTaken.set(name, taken+1);
+      }
+      groupSeen.set(name, seen+1);
+    }
     index++;
   }
-  return { points, n: count, bounds: { xmin, xmax, ymin, ymax } };
+  return { points, n: count, groups: [...groupCounts.keys()], bounds: { xmin, xmax, ymin, ymax } };
 }
 
 export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxplot }) {
@@ -138,13 +157,14 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
       binCount: thumbnail ? 0 : Number($('gbBins').value),
       percent: !thumbnail && $('gbYScale').value === 'percent',
       sameX: !thumbnail && $('gbSameX').checked,
-      sameY: !thumbnail && $('gbSameY').checked
+      sameY: !thumbnail && $('gbSameY').checked,
+      normalFit: !thumbnail && $('gbNormalFit').checked
     };
     const key = JSON.stringify(options);
     if (key !== histogramKey) {
       const plots = buildHistogram(data, options);
       histogramResult = {
-        svg: drawHistogram(plots, { percent: options.percent, legend: options.group !== null || options.overlay, escape }),
+        svg: drawHistogram(plots, { percent: options.percent, legend: options.group !== null || options.overlay, normalFit: options.normalFit, escape }),
         note: plots.length === 1
           ? plots[0].n.toLocaleString('en-US') + ' observations plotted'
           : plots.length + ' histograms · ' + plots.reduce((total, panel) => total + panel.n, 0).toLocaleString('en-US') + ' observations plotted across panels'
@@ -179,14 +199,27 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
       svg = barSvg(counts.entries, escape);
     } else if (type === 'scatter') {
       if (xField.value === '' || x === y) throw Error('Choose a different X column for the scatterplot.');
-      const scatter = cached('scatter:' + x + ':' + y, () => scatterPoints(rows, x, y));
+      const groupIndex = !thumbnail && group.value !== '' ? Number(group.value) : null;
+      if (groupIndex !== null && [x, y].includes(groupIndex)) throw Error('Choose a separate grouping column.');
+      const scatter = cached('scatter:' + x + ':' + y + ':' + groupIndex, () => scatterPoints(rows, x, y, groupIndex));
       n = scatter.n;
       const fit = $('gbFit').checked && !thumbnail
         ? cached('fit:' + x + ':' + y, () => regression(rows.map(row => row[x]), rows.map(row => row[y]), POINT_LIMIT))
         : null;
       const points = thumbnail && scatter.points.length > 100 ? scatter.points.filter((_, index) => index % 8 === 0) : scatter.points;
       shown = points.length;
+      if (groupIndex !== null) {
+        const groups = scatter.groups;
+        const palette = ['#3975dc','#bf4848','#25856e','#8b59ab','#d47434','#587d2c','#346c88','#915b3d'];
+        if (groups.length > palette.length) throw Error('Scatterplot supports at most eight visible groups.');
+        for (const point of points) point[3] = palette[groups.indexOf(point[4])];
+      }
       svg = drawChart({ points, fit, bounds: scatter.bounds, xLabel: xName, yLabel: yName });
+      if (groupIndex !== null) {
+        const groups = scatter.groups;
+        const palette = ['#3975dc','#bf4848','#25856e','#8b59ab','#d47434','#587d2c','#346c88','#915b3d'];
+        svg = svg.replace('</svg>', `<g>${groups.map((name, index) => `<circle cx="50" cy="${20 + index*18}" r="4" fill="${palette[index]}"/><text x="62" y="${24 + index*18}">${escape(name)}</text>`).join('')}</g></svg>`);
+      }
     } else {
       const series = cached('series:' + y, () => {
         const values = [];
@@ -219,6 +252,7 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
     $('gbVariableField').hidden = histogram;
     $('gbHistogramSource').hidden = !histogram;
     $('gbHistogramScale').hidden = !histogram;
+    $('gbGroupField').hidden = !(histogram || active === 'scatter');
     $('gbCombinations').disabled = byField.selectedOptions.length < 2;
     $('gbXField').hidden = !(gallery || active === 'scatter');
     $('gbBinsField').hidden = active !== 'histogram';
@@ -273,6 +307,7 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
     $('gbYScale').value = 'frequency';
     $('gbSameY').checked = true;
     $('gbSameX').checked = false;
+    $('gbNormalFit').checked = false;
     $('gbTitle').value = '';
     $('gbBins').value = '0';
     $('gbFit').checked = false;

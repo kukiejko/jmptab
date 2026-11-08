@@ -44,7 +44,9 @@ test('normal samples default to mean zero and sigma one, with optional outliers'
   assert.ok(Math.abs(mean) < 0.05);
   assert.ok(Math.abs(sigma - 1) < 0.05);
   const withOutliers = generateSampleData({ ...settings, outliers: true, outlierPercent: 5 }).rows.map(row => Number(row[0]));
-  assert.equal(withOutliers.slice(0, 500).filter(value => Math.abs(value) === 4.5).length, 500);
+  assert.equal(withOutliers.filter(value => Math.abs(value) === 4.5).length, 500);
+  assert.equal(withOutliers.slice(0, 500).filter(value => Math.abs(value) === 4.5).length, 25);
+  assert.ok(withOutliers.slice(0, 500).some(value => Math.abs(value) !== 4.5));
   assert.ok(base.slice(0, 500).every(value => Math.abs(value) !== 4.5));
 });
 

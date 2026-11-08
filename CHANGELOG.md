@@ -2,6 +2,27 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.31 — 2026-11-08
+
+- Added resizable charts to every statistical analysis result, with sizes retained while switching results in the Navigator.
+- Added visible column roles and data types, including X3, plus editable column names and optional units.
+- Added column display formats for date, time, timestamp, integer, float, scientific, text, PLN/EUR/USD/GBP currency, and validated Excel-style custom numeric patterns. Display formatting preserves raw worksheet values.
+- Sample data now creates worksheets with matching numeric/text formats, roles, and optional measurement units for Value, X, and Y.
+- Improved large-sample worksheet display and column selection/copy workflows.
+- Deployment time: recorded when the local server starts and shown in Help and `/app-info.json`.
+
+## 0.1.30 — 2026-11-07
+
+- Added grouped descriptive statistics, one-way ANOVA with Tukey pairwise comparisons, and a two-factor factorial design workflow with stored model, effects plots, and prediction.
+- Added a normal curve option to histograms, grouped scatterplots, graph layouts, and graph title and footnote editing.
+- Added Xbar-S charts with subgroup and stage labels, plus capability analysis using a single specification limit or labeled subgroups.
+- Added XLSX and tab-delimited text import, worksheet stacking, text recoding, date labels, and calculated columns that refresh after source edits.
+- Added repeatable analysis commands, a Command Line / History dialog, session-history restoration, and `.jmt` command files.
+
+## 0.1.29 — 2026-11-07
+
+- Added Contour Plot and draggable 3D Surface Plot under Stat > Design of Experiment > Response Surface, with a shared variable selection dialog, fixed-factor settings, quadratic fit, colored legend, and SVG export.
+
 ## 0.1.28 — 2026-11-07
 
 - Clicking a box in a boxplot pins its group, quartile, median, IQR, whisker, and sample-size details until the next click or Escape.

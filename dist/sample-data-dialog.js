@@ -9,6 +9,9 @@ export function setupSampleDataDialog({ onGenerate }) {
           <label for="sampleType">Data for</label><select id="sampleType" name="type"><option value="boxplot">Boxplot</option><option value="scatterplot">Scatterplot</option><option value="histogram">Histogram</option></select>
           <label for="sampleDistribution">Distribution</label><select id="sampleDistribution" name="distribution"><option value="normal">Normal</option><option value="uniform">Uniform</option><option value="exponential">Exponential</option><option value="bimodal">Bimodal</option></select>
           <label for="sampleCount">Number of points</label><input id="sampleCount" name="count" type="number" min="2" max="1048576" step="1" required>
+          <label for="sampleValueUnit" class="sample-value-only">Value unit (optional)</label><input id="sampleValueUnit" class="sample-value-only" name="valueUnit" maxlength="100" placeholder="e.g. mm">
+          <label for="sampleXUnit" class="sample-scatter-only">X unit (optional)</label><input id="sampleXUnit" class="sample-scatter-only" name="xUnit" maxlength="100" placeholder="e.g. °C">
+          <label for="sampleYUnit" class="sample-scatter-only">Y unit (optional)</label><input id="sampleYUnit" class="sample-scatter-only" name="yUnit" maxlength="100" placeholder="e.g. mm">
           <label for="sampleMin" id="sampleMinLabel" class="range-only">Value minimum</label><input id="sampleMin" class="range-only" name="min" type="number" step="any">
           <label for="sampleMax" id="sampleMaxLabel" class="range-only">Value maximum</label><input id="sampleMax" class="range-only" name="max" type="number" step="any">
           <label for="sampleYMin" class="range-scatter-only">Y minimum</label><input id="sampleYMin" class="range-scatter-only" name="yMin" type="number" step="any">
@@ -63,7 +66,8 @@ export function setupSampleDataDialog({ onGenerate }) {
     const settings = Object.fromEntries(fields.map(name => [name, field(name).value]));
     try {
       if (Object.values(settings).some(value => value === '')) throw new Error('Complete all visible fields.');
-      const data = generateSampleData({ type, distribution, ...settings, outliers: distribution === 'normal' && field('outliers').checked });
+      const units = type === 'scatterplot' ? { xUnit: field('xUnit').value, yUnit: field('yUnit').value } : { valueUnit: field('valueUnit').value };
+      const data = generateSampleData({ type, distribution, ...settings, ...units, outliers: distribution === 'normal' && field('outliers').checked });
       if (onGenerate(data, type) !== false) dialog.close();
     } catch (error) {
       const message = document.getElementById('sampleDataError');

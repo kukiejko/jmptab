@@ -58,6 +58,15 @@ export function renderAnalysisResult({ type, s, column, predictorColumn, rowCoun
       report=JSON.stringify({
         ...s,observations:s.n>PLOT_LIMIT?undefined:s.observations,fitted:s.n>PLOT_LIMIT?undefined:s.fitted
       },null,2);
+    }else if(type==='xbar-s-chart'){
+      const points = s.means.map((value, index) => [index+1, value, s.signals.includes(index), null, s.labels[index]]);
+      const sPoints = s.standardDeviations.map((value, index) => [index+1, value, s.sSignals.includes(index), null, s.labels[index]]);
+      html=metrics([['Subgroups',s.groups],['Mean signals',s.signals.length],['S signals',s.sSignals.length]])
+        +`<p class="chart-title">Xbar chart</p>`+svgChart({points,connect:true,lines:[{y:s.ucl,label:'UCL'},{y:s.center,label:'Center'},{y:s.lcl,label:'LCL'}],xLabel:'Subgroup',yLabel:'Mean'})
+        +`<p class="chart-title">S chart</p>`+svgChart({points:sPoints,connect:true,lines:[{y:s.sUcl,label:'UCL'},{y:s.sCenter,label:'Center'},{y:s.sLcl,label:'LCL'}],xLabel:'Subgroup',yLabel:'StDev'})
+        +statRows([['Subgroup size',s.subgroupSize],['Xbar LCL',fmt(s.lcl)],['Xbar UCL',fmt(s.ucl)],['S LCL',fmt(s.sLcl)],['S UCL',fmt(s.sUcl)]])
+        +note('Stages',s.stages.some(Boolean)?`Stage labels: ${[...new Set(s.stages)].join(', ')}. Limits are calculated across all stages.`:'No stage column selected.');
+      report=JSON.stringify(s,null,2);
     }else if(type==='xbar-chart'){
       html=metrics([['Center mean',fmt(s.center,5)],['Subgroups',s.groups],['Outside limits',s.signals.length]])+`<p class="chart-title">Mean by consecutive subgroup</p>`+svgChart({
         points:chartObservations(s.means,s.lcl,s.ucl,PLOT_LIMIT),connect:true,lines:[{
@@ -87,7 +96,7 @@ export function renderAnalysisResult({ type, s, column, predictorColumn, rowCoun
     }else if(type==='control'||type==='capability'){
       html=type==='control'?metrics([['Process mean',fmt(s.mean)],['Within σ',fmt(s.sigma)],['Outside limits',s.signals.length]]):metrics([['Cp',fmt(s.cp)],['Cpk',fmt(s.cpk)],['Outside specs',s.outside]]);
       html+=`<p class="chart-title">${type==='control'?'Individuals chart':'Observed process and specification limits'}</p>`+svgChart({
-        points:chartObservations(s.values, type==='control'?s.lcl:s.lsl, type==='control'?s.ucl:s.usl, PLOT_LIMIT),connect:true,lines:type==='control'?[{
+        points:chartObservations(s.values, type==='control'?s.lcl:(s.lsl ?? -Infinity), type==='control'?s.ucl:(s.usl ?? Infinity), PLOT_LIMIT),connect:true,lines:type==='control'?[{
           y:s.ucl,label:'UCL',color:'#c67979'
         },{
           y:s.mean,label:'Mean',color:'#3d71ce'
@@ -99,9 +108,9 @@ export function renderAnalysisResult({ type, s, column, predictorColumn, rowCoun
           y:s.mean,label:'Mean',color:'#3d71ce'
         },{
           y:s.lsl,label:'LSL',color:'#c67979'
-        }],xLabel:'Observation',yLabel:column
+        }].filter(line => line.y !== null),xLabel:'Observation',yLabel:column
       });
-      html+=type==='control'?note(s.signals.length?'Points outside control limits':'No points outside control limits',s.signals.length?`Review observations ${s.signals.slice(0, 15).map(i=>i+1).join(', ')}${s.signals.length>15?' and '+(s.signals.length-15).toLocaleString('en-US')+' more':''}. Limits are estimated from all observations.`:'This check flags points beyond 3σ only. Other patterns and stability rules have not been tested.')+statRows([['Upper control limit',fmt(s.ucl)],['Lower control limit',fmt(s.lcl)],['Average moving range',fmt(s.mrbar)],['Observations',s.n]]):statRows([['Pp (overall)',fmt(s.pp)],['Ppk (overall)',fmt(s.ppk)],['Within σ (MR̄ / 1.128)',fmt(s.sigma)],['Sample standard deviation',fmt(s.sd)],['Lower specification',fmt(s.lsl)],['Upper specification',fmt(s.usl)]])+note('Capability assumptions','Use capability indices only for a stable, representative process with an appropriate distribution. Cp/Cpk use moving-range σ; Pp/Ppk use overall sample standard deviation.');
+      html+=type==='control'?note(s.signals.length?'Points outside control limits':'No points outside control limits',s.signals.length?`Review observations ${s.signals.slice(0, 15).map(i=>i+1).join(', ')}${s.signals.length>15?' and '+(s.signals.length-15).toLocaleString('en-US')+' more':''}. Limits are estimated from all observations.`:'This check flags points beyond 3σ only. Other patterns and stability rules have not been tested.')+statRows([['Upper control limit',fmt(s.ucl)],['Lower control limit',fmt(s.lcl)],['Average moving range',fmt(s.mrbar)],['Observations',s.n]]):statRows([['Pp (overall)',fmt(s.pp)],['Ppk (overall)',fmt(s.ppk)],[s.withinMethod || 'Within σ (MR̄ / 1.128)',fmt(s.sigma)],['Sample standard deviation',fmt(s.sd)],['Lower specification',fmt(s.lsl)],['Upper specification',fmt(s.usl)]])+note('Capability assumptions','Use capability indices only for a stable, representative process with an appropriate distribution. Cp/Cpk use within-process σ; Pp/Ppk use overall sample standard deviation.');
       report=JSON.stringify(s,(key,value)=>s.n>PLOT_LIMIT&&(key==='pairs'||key==='values')?undefined:value,2);
     }else{
       html=metrics([['Mean',fmt(s.mean)],['Standard deviation',fmt(s.sd)],['Observations',s.n]])+`<p class="chart-title">Distribution of ${esc(column)}</p>`+svgChart({

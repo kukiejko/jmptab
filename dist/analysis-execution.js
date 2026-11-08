@@ -1,7 +1,7 @@
 import { movingAverage, exponentialSmoothing } from './time-series.js';
-import { xbarChart } from './quality.js';
+import { xbarChart, xbarSChart, capabilityBySubgroup } from './quality.js';
 import { oneSampleT, oneSampleTFromValues, pearsonCorrelation } from './inference.js';
-import { regression, control, capability, pChart, histogram } from './stats.js';
+import { regression, control, capabilityWithOptionalLimits, pChart, histogram } from './stats.js';
 
 export const PLOT_LIMIT = 800;
 
@@ -29,12 +29,16 @@ export function executeAnalysis({ type, rows, responseIndex, predictorIndex, opt
       return exponentialSmoothing(values, options.weight, options.initialPeriods);
     case 'xbar-chart':
       return xbarChart(values, options.subgroupSize, options.targetMean, options.sigma);
+    case 'xbar-s-chart':
+      return xbarSChart(rows, responseIndex, options);
     case 'p-chart':
       return pChart(values, options.subgroupSize, options.targetProportion);
     case 'control':
       return control(values);
     case 'capability':
-      return capability(values, options.lsl, options.usl);
+      return options.subgroupColumn === null || options.subgroupColumn === undefined
+        ? capabilityWithOptionalLimits(values, options.lsl, options.usl)
+        : capabilityBySubgroup(rows, responseIndex, options.subgroupColumn, options.lsl, options.usl);
     case 'summary':
     case 'histogram':
       return histogram(values);

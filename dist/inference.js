@@ -39,7 +39,7 @@ function betaFraction(a, b, x) {
   throw Error('The t-distribution calculation did not converge.');
 }
 
-function regularizedBeta(x, a, b) {
+export function regularizedBeta(x, a, b) {
   if (x <= 0) return 0;
   if (x >= 1) return 1;
   const factor = Math.exp(logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log1p(-x));
@@ -52,7 +52,7 @@ export function tCdf(t, degreesOfFreedom) {
   return t >= 0 ? 1 - tail : tail;
 }
 
-function tQuantile(probability, degreesOfFreedom) {
+export function tQuantile(probability, degreesOfFreedom) {
   if (probability === 0.5) return 0;
   if (probability < 0.5) return -tQuantile(1 - probability, degreesOfFreedom);
   let low = 0;

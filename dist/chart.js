@@ -67,7 +67,7 @@ export function svgChart({
     body += `<line x1="${X(xmin)}" y1="${Y(fit.intercept + fit.slope * xmin)}" x2="${X(xmax)}" y2="${Y(fit.intercept + fit.slope * xmax)}" stroke="#203f76" stroke-width="2"/>`;
   }
   body += points.map(point =>
-    `<circle cx="${X(point[0])}" cy="${Y(point[1])}" r="3.5" fill="${point[2] ? '#bf4848' : '#3975dc'}" fill-opacity=".8"><title>${fmt(point[0])}, ${fmt(point[1])}${point[2] ? ' · outside limits' : ''}</title></circle>`
+    `<circle cx="${X(point[0])}" cy="${Y(point[1])}" r="3.5" fill="${point[3] || (point[2] ? '#bf4848' : '#3975dc')}" fill-opacity=".8"><title>${fmt(point[0])}, ${fmt(point[1])}${point[4] ? ' · ' + esc(point[4]) : ''}${point[2] ? ' · outside limits' : ''}</title></circle>`
   ).join('');
 
   return `<svg class="chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(yLabel)} by ${esc(xLabel)}"><title>${esc(yLabel)} by ${esc(xLabel)}</title>${body}<text x="${width / 2}" y="${height - 3}" text-anchor="middle">${esc(xLabel)}</text></svg>`;

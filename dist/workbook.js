@@ -1,6 +1,7 @@
 import { MAX_COLUMNS, MAX_ROWS } from './stats.js';
+import { isValidColumnFormat } from './column-format.js';
 
-export const COLUMN_ROLE_GROUPS = { X: ['X1', 'X2'], Y: ['Y1', 'Y2', 'Y3'], Z: ['Z1', 'Z2', 'Z3'], G: ['G'] };
+export const COLUMN_ROLE_GROUPS = { X: ['X1', 'X2', 'X3'], Y: ['Y1', 'Y2', 'Y3'], Z: ['Z1', 'Z2', 'Z3'], G: ['G'] };
 export const COLUMN_ROLES = Object.values(COLUMN_ROLE_GROUPS).flat();
 
 export function nextWorksheetName(worksheets) {
@@ -31,6 +32,8 @@ export function validWorksheet(sheet) {
   return typeof sheet.name === 'string' && sheet.name.length > 0 &&
     Array.isArray(data?.headers) && data.headers.length > 0 && data.headers.length <= MAX_COLUMNS &&
     (!data.roles || (Array.isArray(data.roles) && data.roles.length === data.headers.length && data.roles.every(role => role === '' || COLUMN_ROLES.includes(role)))) &&
+    (!data.formats || (Array.isArray(data.formats) && data.formats.length === data.headers.length && data.formats.every(isValidColumnFormat))) &&
+    (!data.units || (Array.isArray(data.units) && data.units.length === data.headers.length && data.units.every(unit => typeof unit === 'string' && unit.length <= 100))) &&
     Array.isArray(data.rows) && data.rows.length <= MAX_ROWS &&
     data.rows.every(row => Array.isArray(row) && row.length <= data.headers.length);
 }
