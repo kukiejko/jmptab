@@ -73,13 +73,13 @@ function attachSplitter({ handle, container, axis, limits, getSize, setSize, res
   });
 }
 
-export function createResizableLayout({ workbench, navigator, navHandle, panes, paneHandle, table, tableScroll, getWorksheet }) {
+export function createResizableLayout({ workbench, navigator, navHandle, panes, paneHandle, table, tableScroll, getWorksheet, getPageSize }) {
   const storage = createStorage();
   let columnWidths = Array.isArray(storage.get('columnWidths'))
     ? storage.get('columnWidths').filter(width => Number.isFinite(width) && width >= MIN_COLUMN_WIDTH && width <= MAX_COLUMN_WIDTH)
     : [];
   let outputRatio = Number.isFinite(storage.get('outputRatio'))
-    ? clamp(storage.get('outputRatio'), 0.1, 0.9) : 0.54;
+    ? clamp(storage.get('outputRatio'), 0.1, 0.9) : 0.5;
   let navigatorWidth;
 
   function navLimits(rect) {
@@ -94,7 +94,7 @@ export function createResizableLayout({ workbench, navigator, navHandle, panes, 
     storage.set('navigatorWidth', value);
   }
   function outputLimits(rect) {
-    return [120, Math.max(120, rect.height - 120 - SPLITTER_WIDTH)];
+    return [120, Math.max(120, rect.height - 260 - SPLITTER_WIDTH)];
   }
   function setOutputHeight(height) {
     outputRatio = height / Math.max(1, panes.getBoundingClientRect().height);
@@ -113,11 +113,15 @@ export function createResizableLayout({ workbench, navigator, navHandle, panes, 
     handle: paneHandle, container: panes, axis: 'y', limits: outputLimits,
     getSize: () => outputRatio * panes.clientHeight,
     setSize: setOutputHeight,
-    resetSize: () => setOutputHeight(0.54 * panes.clientHeight)
+    resetSize: () => setOutputHeight(0.5 * panes.clientHeight)
   });
 
   function defaultColumnWidth(count) {
-    return clamp(Math.floor((tableScroll.clientWidth - ROW_NUMBER_WIDTH) / Math.max(1, count)), 130, 360);
+    return clamp(Math.floor((tableScroll.clientWidth - ROW_NUMBER_WIDTH - pageNumberWidth()) / Math.max(1, count)), 130, 360);
+  }
+  function pageNumberWidth() {
+    const pageCount = Math.max(1, Math.ceil(getWorksheet().rows.length / getPageSize()));
+    return Math.max(38, String(pageCount).length * 7 + 10);
   }
   function widthsFor(count) {
     const width = defaultColumnWidth(count);
@@ -127,14 +131,16 @@ export function createResizableLayout({ workbench, navigator, navHandle, panes, 
   }
   function applyColumnWidths(first = 0, last = columnWidths.length) {
     const columns = table.querySelectorAll('col');
-    if (columns.length !== last - first + 1) return;
-    columns[0].style.width = `${ROW_NUMBER_WIDTH}px`;
+    if (columns.length !== last - first + 2) return;
+    const pageWidth = pageNumberWidth();
+    columns[0].style.width = `${pageWidth}px`;
+    columns[1].style.width = `${ROW_NUMBER_WIDTH}px`;
     for (let index = first; index < last; index++) {
       const width = columnWidths[index];
-      columns[index - first + 1].style.width = `${width}px`;
+      columns[index - first + 2].style.width = `${width}px`;
       table.querySelector(`[data-resize-column="${index}"]`)?.setAttribute('aria-valuenow', width);
     }
-    table.style.width = `${ROW_NUMBER_WIDTH + columnWidths.slice(first, last).reduce((sum, width) => sum + width, 0)}px`;
+    table.style.width = `${pageWidth + ROW_NUMBER_WIDTH + columnWidths.slice(first, last).reduce((sum, width) => sum + width, 0)}px`;
   }
   function setColumnWidth(index, width, persist = true) {
     columnWidths[index] = Math.round(clamp(width, MIN_COLUMN_WIDTH, MAX_COLUMN_WIDTH));

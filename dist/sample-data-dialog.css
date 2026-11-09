@@ -4,6 +4,9 @@
 .sample-data-fields input, .sample-data-fields select { width: 100%; min-width: 0; padding: .4rem; border: 1px solid #adbed2; border-radius: 3px; background: white; color: inherit; }
 .sample-data-dialog .range-only, .sample-data-dialog .range-scatter-only, .sample-data-dialog .box-only { display: none; }
 .sample-data-dialog .sample-scatter-only { display: none; }
+.sample-data-dialog .sample-date-only, .sample-data-dialog .sample-timestamp-only, .sample-data-dialog .sample-temporal-only { display: none; }
+.sample-data-dialog.sample-date .sample-date-only, .sample-data-dialog.sample-timestamp .sample-timestamp-only, .sample-data-dialog.sample-temporal .sample-temporal-only { display: block; }
+.sample-data-dialog.sample-temporal #sampleXUnit, .sample-data-dialog.sample-temporal label[for="sampleXUnit"], .sample-data-dialog.sample-temporal #sampleMin, .sample-data-dialog.sample-temporal #sampleMax, .sample-data-dialog.sample-temporal #sampleMinLabel, .sample-data-dialog.sample-temporal #sampleMaxLabel { display: none; }
 .sample-data-dialog.sample-scatter .sample-value-only { display: none; }
 .sample-data-dialog.sample-scatter .sample-scatter-only { display: block; }
 .sample-data-dialog:not(.sample-normal) .range-only, .sample-data-dialog.sample-scatter:not(.sample-normal) .range-scatter-only, .sample-data-dialog.sample-box .box-only { display: block; }

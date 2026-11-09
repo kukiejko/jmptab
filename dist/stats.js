@@ -145,7 +145,49 @@ export function pChart(counts, subgroupSize, target = null) {
   return { n: parsed.length, subgroupSize, target, center, lcl, ucl, signals, proportions };
 }
 export function histogram(values){const s=summary(values),k=Math.min(20,Math.ceil(Math.sqrt(s.n))),width=(s.max-s.min||1)/k,bins=Array(k).fill(0);s.values.forEach(v=>bins[Math.min(k-1,Math.floor((v-s.min)/width))]++);return{...s,bins,width};}
-export function parseDelimited(text, delimiter = ','){text=text.replace(/^\uFEFF/,'');const rows=[];let row=[],field='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){field+='"';i++;}else if(!quoted&&field!=='')throw Error('Unexpected quote in delimited text.');else quoted=!quoted;}else if(c===delimiter&&!quoted){row.push(field);field='';}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(field);if (row.length > 1 || row[0] !== '') rows.push(row);row=[];field='';}else field+=c;}if(quoted)throw Error('Delimited text has an unclosed quoted field.');row.push(field);if (row.length > 1 || row[0] !== '') rows.push(row);if(rows.length<2)throw Error('Delimited text must include a header and at least one data row.');const headers=rows.shift().map((v,i)=>v.trim()||`Column ${i+1}`);if(headers.length>MAX_COLUMNS||rows.length>MAX_ROWS)throw Error('Import up to 16,384 columns and 1,048,576 rows.');if(rows.some(r=>r.length!==headers.length))throw Error('Each row must have the same number of fields as the header.');return{headers,rows};}
+export function delimitedRecords(text, delimiter = ',', { maxRecords = Infinity, collapseDelimiters = false } = {}) {
+  if (typeof text !== 'string' || typeof delimiter !== 'string' || delimiter.length !== 1) throw Error('Choose a single-character delimiter.');
+  text = text.replace(/^\uFEFF/, '');
+  const records = [];
+  let row = [], field = '', quoted = false;
+  const finish = () => {
+    row.push(field);
+    if (row.length > MAX_COLUMNS) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
+    if (row.length > 1 || row[0] !== '') records.push(row);
+    if (records.length > MAX_ROWS + 1) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
+    row = []; field = '';
+  };
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (char === '"') {
+      if (quoted && text[index + 1] === '"') { field += '"'; index++; }
+      else if (!quoted && field !== '') throw Error('Unexpected quote in delimited text.');
+      else quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      if (!collapseDelimiters || field !== '' || row.length === 0) row.push(field);
+      field = '';
+      if (row.length > MAX_COLUMNS) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
+    } else if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && text[index + 1] === '\n') index++;
+      finish();
+      if (records.length >= maxRecords) return records;
+    } else field += char;
+  }
+  if (quoted) throw Error('Delimited text has an unclosed quoted field.');
+  finish();
+  return records;
+}
+
+export function parseDelimited(text, delimiter = ',') {
+  const rows = delimitedRecords(text, delimiter);
+  if (rows.length < 2) throw Error('Delimited text must include a header and at least one data row.');
+  const headers = rows.shift().map((value, index) => value.trim() || `Column ${index + 1}`);
+  if (rows.length > MAX_ROWS || rows.some(row => row.length !== headers.length)) {
+    if (rows.length > MAX_ROWS) throw Error('Import up to 16,384 columns and 1,048,576 rows.');
+    throw Error('Each row must have the same number of fields as the header.');
+  }
+  return { headers, rows };
+}
 export const parseCSV = text => parseDelimited(text, ',');
 export function parseTextFile(text){const first = text.split(/\r?\n/,1)[0];return parseDelimited(text,first.includes('\t')?'\t':',');}
 export function* csvChunks(data, rowsPerChunk = 5_000) {

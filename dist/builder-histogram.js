@@ -1,4 +1,5 @@
 import { numeric } from './stats.js';
+import { groupedNumber } from './number-display.js';
 
 const MAX_PANELS = 24;
 const MAX_SERIES = 16;
@@ -109,11 +110,11 @@ export function drawHistogram(plots, { percent, legend, normalFit = false, escap
   const chartHeight = 145;
   const top = 45;
   const base = top + chartHeight;
-  const format = value => escape(value.toLocaleString('en-US', { maximumSignificantDigits: 7 }));
+  const format = value => escape(groupedNumber(value, { maximumSignificantDigits: 7 }));
   const clip = (value, max) => value.length > max ? value.slice(0, max - 1) + '…' : value;
   let offset = 0;
   const content = plots.map(panel => {
-    const showLegend = legend || panel.series.length > 1;
+    const showLegend = true;
     const legendHeight = showLegend ? Math.ceil(panel.series.length / 3) * 19 : 0;
     const yPosition = height => base - chartHeight * height / panel.yMax;
     const interval = chartWidth / panel.binCount;
@@ -125,7 +126,7 @@ export function drawHistogram(plots, { percent, legend, normalFit = false, escap
       const value = panel.min + i / 4 * (panel.max - panel.min);
       grid += `<line x1="${left}" x2="${left + chartWidth}" y1="${y}" y2="${y}" stroke="#e2e9f1"/>
         <text x="${left - 8}" y="${y + 3}" text-anchor="end">${format(height)}${percent ? '%' : ''}</text>
-        <text x="${x}" y="${base + 17}" text-anchor="middle">${format(value)}</text>`;
+        <text class="x-axis-tick" x="${x}" y="${base + 17}" text-anchor="middle">${format(value)}</text>`;
     }
     const bars = panel.series.map(series => series.heights.map((height, index) => {
       if (!height) return '';
@@ -158,5 +159,5 @@ export function drawHistogram(plots, { percent, legend, normalFit = false, escap
     offset += base + 31 + legendHeight;
     return plot;
   }).join('');
-  return `<svg class="chart histogram-chart" viewBox="0 0 ${width} ${offset}" role="img" aria-label="${plots.length} histogram panels">${content}</svg>`;
+  return `<svg class="chart histogram-chart" data-legend-native="true" viewBox="0 0 ${width} ${offset}" role="img" aria-label="${plots.length} histogram panels">${content}</svg>`;
 }

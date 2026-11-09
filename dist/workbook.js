@@ -27,6 +27,30 @@ export function renameWorksheet(worksheets, index, requestedName) {
   return previous;
 }
 
+export function visibleWorksheetIndices(worksheets) {
+  return worksheets.flatMap((sheet, index) => sheet.hidden ? [] : [index]);
+}
+
+export function moveWorksheet(worksheets, from, to) {
+  if (from < 0 || from >= worksheets.length || to < 0 || to >= worksheets.length || from === to) return false;
+  worksheets.splice(to, 0, worksheets.splice(from, 1)[0]);
+  return true;
+}
+
+export function hideWorksheet(worksheets, index) {
+  if (visibleWorksheetIndices(worksheets).length <= 1) throw Error('At least one worksheet must remain visible.');
+  worksheets[index].hidden = true;
+}
+
+export function showWorksheet(worksheets, index) {
+  worksheets[index].hidden = false;
+}
+
+export function deleteWorksheet(worksheets, index) {
+  if (worksheets.length <= 1) throw Error('At least one worksheet must remain in the project.');
+  return worksheets.splice(index, 1)[0];
+}
+
 export function validWorksheet(sheet) {
   const data = sheet?.data;
   return typeof sheet.name === 'string' && sheet.name.length > 0 &&

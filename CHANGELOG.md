@@ -2,6 +2,16 @@
 
 Versions use `X.Y.Z` format. The local deployment time is recorded when the server starts and appears in Help. It is also available as `deployedAt` from `/app-info.json` in UTC. A source commit alone does not establish that a server has restarted.
 
+## 0.1.32 — 2026-11-09
+
+- Added CSV import preview with configurable delimiters and column formats.
+- Added scatterplot rectangle selection that marks matching worksheet rows and highlights selected points, plus select-and-zoom and Deselect all.
+- Added worksheet page views, configurable rows per page, and page numbers beside row numbers.
+- Added column marking and Copy selected controls for the worksheet.
+- Added plot settings for axes, labels, and chart formatting, along with movable statistics and charts.
+- Improved scatterplot handling of large datasets, sample data with date or timestamp X values, and graph metadata in SVG exports.
+- Deployment time: recorded when the local server starts and shown in Help and `/app-info.json`.
+
 ## 0.1.31 — 2026-11-08
 
 - Added resizable charts to every statistical analysis result, with sizes retained while switching results in the Navigator.

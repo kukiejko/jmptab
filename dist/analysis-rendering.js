@@ -2,6 +2,7 @@ import { chartObservations } from './stats.js';
 import { PLOT_LIMIT } from './analysis-execution.js';
 import { esc, fmt } from './result-format.js';
 import { svgChart } from './chart.js';
+import { groupedNumber } from './number-display.js';
 export { esc, fmt, svgChart };
 
 function metrics(items){return'<div class="metrics">'+items.map(([k,v])=>`<div class="metric"><label>${esc(k)}</label><strong>${esc(v)}</strong></div>`).join('')+'</div>';}
@@ -36,21 +37,21 @@ function timeSeriesResult(result, column) {
     + statRows([[method[0], method[1]], ...(method.length > 2 ? [[method[2], method[3]]] : []), ['Fitted periods', result.fitted.length]])
     + note('Forecast method', 'Each fitted value uses prior observations. The final estimate forecasts the next period.');
 }
-export function renderAnalysisResult({ type, s, column, predictorColumn, rowCount }) {
+export function renderAnalysisResult({ type, s, column, predictorColumn, rowCount, responseAxisLabel, predictorAxisLabel }) {
   let html = '', report = '';
     if(type==='one-sample-t'){
       html=tResult(s);
       report=JSON.stringify(s,(key,value)=>value===Infinity?'+Infinity':value===-Infinity?'-Infinity':value,2);
     }else if(type==='correlation'){
       html=metrics([['Pearson r',fmt(s.r,5)],['p-value',fmt(s.pValue,6)],['Complete pairs',s.n]])+`<p class="chart-title">${esc(column)} vs ${esc(predictorColumn)}</p>`+svgChart({
-        points:s.pairs,xLabel:predictorColumn,yLabel:column
+        points:s.pairs,xLabel:predictorAxisLabel || predictorColumn,yLabel:responseAxisLabel || column,rectZoom:true
       })+statRows([['Degrees of freedom',s.df],['Excluded pairs',s.excluded]])+note('Interpretation','Pearson correlation describes a linear association. Check the scatterplot for unusual observations and nonlinear patterns.');
       report=JSON.stringify({
         ...s,pairs:s.n>PLOT_LIMIT?undefined:s.pairs
       },null,2);
     }else if(type==='regression'){
       html=metrics([['R-squared',s.r2===null?'Undefined':fmt(s.r2*100,2)+'%'],['Slope',fmt(s.slope)],['Observations',s.n]])+`<p class="chart-title">${esc(column)} vs ${esc(predictorColumn)}</p>`+svgChart({
-        points:s.pairs,fit:s,xLabel:predictorColumn,yLabel:column
+        points:s.pairs,fit:s,xLabel:predictorAxisLabel || predictorColumn,yLabel:responseAxisLabel || column,rectZoom:true
       })+note('Fitted equation',`${column} = ${fmt(s.intercept,5)} ${s.slope<0?'−':'+'} ${fmt(Math.abs(s.slope),5)} × ${predictorColumn}`)+statRows([['Residual standard deviation',fmt(s.residualSD)],['Excluded pairs',rowCount-s.n]])+note('Interpretation','Least-squares fit with an intercept. A relationship does not establish causation. Examine residuals and model assumptions before drawing conclusions.');
       report=JSON.stringify(s,(key,value)=>s.n>PLOT_LIMIT&&(key==='pairs'||key==='values')?undefined:value,2);
     }else if(type==='moving-average'||type==='exponential-smoothing'){
@@ -110,7 +111,7 @@ export function renderAnalysisResult({ type, s, column, predictorColumn, rowCoun
           y:s.lsl,label:'LSL',color:'#c67979'
         }].filter(line => line.y !== null),xLabel:'Observation',yLabel:column
       });
-      html+=type==='control'?note(s.signals.length?'Points outside control limits':'No points outside control limits',s.signals.length?`Review observations ${s.signals.slice(0, 15).map(i=>i+1).join(', ')}${s.signals.length>15?' and '+(s.signals.length-15).toLocaleString('en-US')+' more':''}. Limits are estimated from all observations.`:'This check flags points beyond 3σ only. Other patterns and stability rules have not been tested.')+statRows([['Upper control limit',fmt(s.ucl)],['Lower control limit',fmt(s.lcl)],['Average moving range',fmt(s.mrbar)],['Observations',s.n]]):statRows([['Pp (overall)',fmt(s.pp)],['Ppk (overall)',fmt(s.ppk)],[s.withinMethod || 'Within σ (MR̄ / 1.128)',fmt(s.sigma)],['Sample standard deviation',fmt(s.sd)],['Lower specification',fmt(s.lsl)],['Upper specification',fmt(s.usl)]])+note('Capability assumptions','Use capability indices only for a stable, representative process with an appropriate distribution. Cp/Cpk use within-process σ; Pp/Ppk use overall sample standard deviation.');
+      html+=type==='control'?note(s.signals.length?'Points outside control limits':'No points outside control limits',s.signals.length?`Review observations ${s.signals.slice(0, 15).map(i=>i+1).join(', ')}${s.signals.length>15?' and '+groupedNumber(s.signals.length-15)+' more':''}. Limits are estimated from all observations.`:'This check flags points beyond 3σ only. Other patterns and stability rules have not been tested.')+statRows([['Upper control limit',fmt(s.ucl)],['Lower control limit',fmt(s.lcl)],['Average moving range',fmt(s.mrbar)],['Observations',s.n]]):statRows([['Pp (overall)',fmt(s.pp)],['Ppk (overall)',fmt(s.ppk)],[s.withinMethod || 'Within σ (MR̄ / 1.128)',fmt(s.sigma)],['Sample standard deviation',fmt(s.sd)],['Lower specification',fmt(s.lsl)],['Upper specification',fmt(s.usl)]])+note('Capability assumptions','Use capability indices only for a stable, representative process with an appropriate distribution. Cp/Cpk use within-process σ; Pp/Ppk use overall sample standard deviation.');
       report=JSON.stringify(s,(key,value)=>s.n>PLOT_LIMIT&&(key==='pairs'||key==='values')?undefined:value,2);
     }else{
       html=metrics([['Mean',fmt(s.mean)],['Standard deviation',fmt(s.sd)],['Observations',s.n]])+`<p class="chart-title">Distribution of ${esc(column)}</p>`+svgChart({

@@ -7,6 +7,7 @@ export const SAMPLE_DEFAULTS = Object.freeze({
 });
 export const SAMPLE_DISTRIBUTIONS = Object.freeze(['normal', 'uniform', 'exponential', 'bimodal']);
 export const DISTRIBUTION_DEFAULTS = Object.freeze({ distribution: 'normal', mean: 0, sigma: 1, outliers: false, outlierPercent: 5 });
+export const SAMPLE_UNIT = 'a.u.';
 
 const randomSource = seed => () => {
   seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -57,19 +58,26 @@ export function generateSampleData(input, random = randomSource(4711)) {
   };
 
   if (type === 'scatterplot') {
+    const xScale = settings.xScale || 'number';
+    if (!['number', 'date', 'timestamp'].includes(xScale)) throw new Error('Choose a valid X scale.');
+    const start = xScale === 'number' ? 0 : Date.parse(xScale === 'date' ? `${settings.startDate || '2025-01-01'}T00:00:00Z` : `${settings.startTimestamp || '2025-01-01T00:00'}Z`);
+    const step = Number(settings.timeStep || 1) * (xScale === 'date' ? 86400000 : 3600000);
+    if (xScale !== 'number' && (!Number.isFinite(start) || !Number.isFinite(step) || step <= 0 || start + (count - 1) * step > 8640000000000000)) throw new Error('Enter a valid start date and positive interval.');
     const yMin = Number(settings.yMin);
     const yMax = Number(settings.yMax);
     if (settings.distribution !== 'normal' && (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMin >= yMax)) throw new Error('Y minimum must be less than Y maximum.');
-    return { headers: ['X', 'Y'], roles: ['X1', 'Y1'], formats: ['float', 'float'], units: [xUnit, yUnit], rows: Array.from({ length: count }, (_, index) => {
-      const x = Number(draw(min, max, 0, index));
+    return { headers: [xScale === 'number' ? 'X' : xScale === 'date' ? 'Date' : 'Timestamp', 'Y'], roles: ['X1', 'Y1'], formats: [xScale === 'number' ? 'float' : xScale, 'float'], units: [xScale === 'number' ? xUnit : '', yUnit], rows: Array.from({ length: count }, (_, index) => {
+      const x = xScale === 'number' ? Number(draw(min, max, 0, index)) : start + index * step;
+      const xCell = xScale === 'number' ? String(x) : xScale === 'date' ? new Date(x).toISOString().slice(0, 10) : new Date(x).toISOString();
       if (settings.distribution === 'normal') {
-        const y = mean + 0.75 * (x - mean) + sigma * normal() * 0.5;
-        return [String(x), String(y)];
+        const trend = xScale === 'number' ? (x - mean) : (index - (count - 1) / 2) / Math.max(1, count - 1) * 2 * sigma;
+        const y = mean + 0.75 * trend + sigma * normal() * 0.5;
+        return [xCell, String(y)];
       }
-      const fraction = (x - min) / (max - min);
+      const fraction = xScale === 'number' ? (x - min) / (max - min) : index / Math.max(1, count - 1);
       const noise = (settings.distribution === 'normal' ? normal() * 0.12 : (randomUnit() - 0.5) * 0.35);
       const y = yMin + (yMax - yMin) * clamp(0.12 + 0.76 * fraction + noise, 0, 1);
-      return [String(x), value(yMin, yMax, y)];
+      return [xCell, value(yMin, yMax, y)];
     }) };
   }
 

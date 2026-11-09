@@ -1,4 +1,4 @@
-import { generateSampleData, SAMPLE_DEFAULTS, DISTRIBUTION_DEFAULTS } from './sample-data.js';
+import { generateSampleData, SAMPLE_DEFAULTS, DISTRIBUTION_DEFAULTS, SAMPLE_UNIT } from './sample-data.js';
 
 export function setupSampleDataDialog({ onGenerate }) {
   document.body.insertAdjacentHTML('beforeend', `
@@ -9,9 +9,13 @@ export function setupSampleDataDialog({ onGenerate }) {
           <label for="sampleType">Data for</label><select id="sampleType" name="type"><option value="boxplot">Boxplot</option><option value="scatterplot">Scatterplot</option><option value="histogram">Histogram</option></select>
           <label for="sampleDistribution">Distribution</label><select id="sampleDistribution" name="distribution"><option value="normal">Normal</option><option value="uniform">Uniform</option><option value="exponential">Exponential</option><option value="bimodal">Bimodal</option></select>
           <label for="sampleCount">Number of points</label><input id="sampleCount" name="count" type="number" min="2" max="1048576" step="1" required>
-          <label for="sampleValueUnit" class="sample-value-only">Value unit (optional)</label><input id="sampleValueUnit" class="sample-value-only" name="valueUnit" maxlength="100" placeholder="e.g. mm">
-          <label for="sampleXUnit" class="sample-scatter-only">X unit (optional)</label><input id="sampleXUnit" class="sample-scatter-only" name="xUnit" maxlength="100" placeholder="e.g. °C">
-          <label for="sampleYUnit" class="sample-scatter-only">Y unit (optional)</label><input id="sampleYUnit" class="sample-scatter-only" name="yUnit" maxlength="100" placeholder="e.g. mm">
+          <label for="sampleXScale" class="sample-scatter-only">X scale</label><select id="sampleXScale" class="sample-scatter-only" name="xScale"><option value="number">Number</option><option value="date">Date</option><option value="timestamp">Timestamp</option></select>
+          <label for="sampleStartDate" class="sample-date-only">Start date</label><input id="sampleStartDate" class="sample-date-only" name="startDate" type="date" value="2025-01-01">
+          <label for="sampleStartTimestamp" class="sample-timestamp-only">Start timestamp (UTC)</label><input id="sampleStartTimestamp" class="sample-timestamp-only" name="startTimestamp" type="datetime-local" value="2025-01-01T00:00">
+          <label for="sampleTimeStep" class="sample-temporal-only" id="sampleTimeStepLabel">Interval (days)</label><input id="sampleTimeStep" class="sample-temporal-only" name="timeStep" type="number" min="1" step="1" value="1">
+          <label for="sampleValueUnit" class="sample-value-only">Value unit (optional)</label><input id="sampleValueUnit" class="sample-value-only" name="valueUnit" maxlength="100" value="${SAMPLE_UNIT}" placeholder="e.g. mm">
+          <label for="sampleXUnit" class="sample-scatter-only">X unit (optional)</label><input id="sampleXUnit" class="sample-scatter-only" name="xUnit" maxlength="100" value="${SAMPLE_UNIT}" placeholder="e.g. °C">
+          <label for="sampleYUnit" class="sample-scatter-only">Y unit (optional)</label><input id="sampleYUnit" class="sample-scatter-only" name="yUnit" maxlength="100" value="${SAMPLE_UNIT}" placeholder="e.g. mm">
           <label for="sampleMin" id="sampleMinLabel" class="range-only">Value minimum</label><input id="sampleMin" class="range-only" name="min" type="number" step="any">
           <label for="sampleMax" id="sampleMaxLabel" class="range-only">Value maximum</label><input id="sampleMax" class="range-only" name="max" type="number" step="any">
           <label for="sampleYMin" class="range-scatter-only">Y minimum</label><input id="sampleYMin" class="range-scatter-only" name="yMin" type="number" step="any">
@@ -42,10 +46,18 @@ export function setupSampleDataDialog({ onGenerate }) {
     for (const [name, value] of Object.entries(defaults)) field(name).value = value;
     dialog.classList.toggle('sample-scatter', type === 'scatterplot');
     dialog.classList.toggle('sample-box', type === 'boxplot');
+    updateXScale();
     document.getElementById('sampleMinLabel').textContent = type === 'scatterplot' ? 'X minimum' : 'Value minimum';
     document.getElementById('sampleMaxLabel').textContent = type === 'scatterplot' ? 'X maximum' : 'Value maximum';
     document.getElementById('sampleDescription').textContent = descriptions[type];
     document.getElementById('sampleDataError').hidden = true;
+  }
+  function updateXScale() {
+    const scale = field('type').value === 'scatterplot' ? field('xScale').value : 'number';
+    dialog.classList.toggle('sample-date', scale === 'date');
+    dialog.classList.toggle('sample-timestamp', scale === 'timestamp');
+    dialog.classList.toggle('sample-temporal', scale !== 'number');
+    document.getElementById('sampleTimeStepLabel').textContent = scale === 'date' ? 'Interval (days)' : 'Interval (hours)';
   }
   function updateDistribution() {
     const isNormal = field('distribution').value === 'normal';
@@ -54,6 +66,7 @@ export function setupSampleDataDialog({ onGenerate }) {
     document.getElementById('sampleDataError').hidden = true;
   }
   field('type').addEventListener('change', updateType);
+  field('xScale').addEventListener('change', updateXScale);
   field('distribution').addEventListener('change', updateDistribution);
   field('outliers').addEventListener('change', updateDistribution);
   document.getElementById('sampleDataClose').onclick = () => dialog.close();
@@ -62,12 +75,13 @@ export function setupSampleDataDialog({ onGenerate }) {
     event.preventDefault();
     const type = field('type').value;
     const distribution = field('distribution').value;
-    const fields = ['count', ...(distribution === 'normal' ? [] : ['min', 'max', ...(type === 'scatterplot' ? ['yMin', 'yMax'] : [])]), ...(type === 'boxplot' ? ['groups'] : []), ...(distribution === 'normal' ? ['mean', 'sigma', ...(field('outliers').checked ? ['outlierPercent'] : [])] : [])];
+    const temporal = type === 'scatterplot' && field('xScale').value !== 'number';
+    const fields = ['count', ...(distribution === 'normal' ? [] : [...(temporal ? [] : ['min', 'max']), ...(type === 'scatterplot' ? ['yMin', 'yMax'] : [])]), ...(type === 'boxplot' ? ['groups'] : []), ...(distribution === 'normal' ? ['mean', 'sigma', ...(field('outliers').checked ? ['outlierPercent'] : [])] : []), ...(temporal ? ['timeStep', field('xScale').value === 'date' ? 'startDate' : 'startTimestamp'] : [])];
     const settings = Object.fromEntries(fields.map(name => [name, field(name).value]));
     try {
       if (Object.values(settings).some(value => value === '')) throw new Error('Complete all visible fields.');
       const units = type === 'scatterplot' ? { xUnit: field('xUnit').value, yUnit: field('yUnit').value } : { valueUnit: field('valueUnit').value };
-      const data = generateSampleData({ type, distribution, ...settings, ...units, outliers: distribution === 'normal' && field('outliers').checked });
+      const data = generateSampleData({ type, distribution, xScale: type === 'scatterplot' ? field('xScale').value : 'number', ...settings, ...units, outliers: distribution === 'normal' && field('outliers').checked });
       if (onGenerate(data, type) !== false) dialog.close();
     } catch (error) {
       const message = document.getElementById('sampleDataError');

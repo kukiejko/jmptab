@@ -1,7 +1,9 @@
 import { numeric } from './stats.js';
 
 const MAX_BOXES = 80;
-const format = value => Number(value).toLocaleString('en-US', { maximumSignificantDigits: 7 });
+import { groupedNumber } from './number-display.js';
+
+const format = value => groupedNumber(value, { maximumSignificantDigits: 7 });
 const quantile = (sorted, p) => {
   const position = (sorted.length - 1) * p;
   const low = Math.floor(position);
@@ -184,7 +186,7 @@ export function drawBoxplot(result, options, escape) {
       });
       meanPoints.push(`${x},${mapValue(box.mean)}`);
       medianPoints.push(`${x},${ym}`);
-      paths.push(`<g class="boxplot-box">${parts.join('')}</g><text x="${x}" y="382" text-anchor="middle">${escape(box.label.length > 18 ? box.label.slice(0, 17) + '…' : box.label)}</text>`);
+      paths.push(`<g class="boxplot-box">${parts.join('')}</g><text class="x-axis-tick" x="${x}" y="382" text-anchor="middle">${escape(box.label.length > 18 ? box.label.slice(0, 17) + '…' : box.label)}</text>`);
       if (options.labels?.showValues) paths.push(`<text x="${x}" y="${ym - 7}" text-anchor="middle">${escape(format(box.median))}</text>`);
     });
     const connections = [view.meanLine && meanPoints.length > 1 ? `<polyline points="${meanPoints.join(' ')}" fill="none" stroke="#d5573b" stroke-width="2"/>` : '',

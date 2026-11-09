@@ -1,5 +1,7 @@
 import { numeric } from './stats.js';
 import { buildBoxplot, drawBoxplot } from './builder-boxplot.js';
+import { groupedNumber } from './number-display.js';
+import { ensureChartLegends } from './result-legends.js';
 
 const layouts = [
   ['one-simple', 'One Y · Simple', 'One numeric column', '<rect x="30" y="25" width="24" height="40"/><line x1="42" y1="15" x2="42" y2="25"/><line x1="42" y1="65" x2="42" y2="76"/>'],
@@ -113,9 +115,10 @@ export function setupBoxplotBuilder({ getData, onCreate, escape }) {
       const result = buildBoxplot(data, settings);
       const svg = drawBoxplot(result, settings, escape);
       const title = settings.labels.title || 'Boxplot';
-      preview = { title, svg, note: `${result.boxCount} boxes · ${result.observations.toLocaleString('en-US')} observations`,
+      preview = { title, svg, note: `${result.boxCount} boxes · ${groupedNumber(result.observations)} observations`,
         type: 'box', label: 'Boxplot', column: settings.yColumns.map(index => data.headers[index]).join(', ') };
       $('bpPreview').innerHTML = `<h3>${escape(title)}</h3>${settings.labels.subtitle ? `<p>${escape(settings.labels.subtitle)}</p>` : ''}${svg}${settings.labels.footnote ? `<p>${escape(settings.labels.footnote)}</p>` : ''}`;
+      ensureChartLegends($('bpPreview'));
       preview.svg = `${settings.labels.subtitle ? `<p>${escape(settings.labels.subtitle)}</p>` : ''}${svg}${settings.labels.footnote ? `<p>${escape(settings.labels.footnote)}</p>` : ''}`;
       $('bpValidation').textContent = '';
       $('bpStatus').textContent = preview.note;

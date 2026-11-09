@@ -1,5 +1,9 @@
-import { setupGraphBuilder } from './graph-builder.js';
+import { setupGraphBuilder, scatterPoints, scatterTrendline, SCATTER_GROUP_COLORS } from './graph-builder.js';
+import { scatterRowsInBounds } from './scatter-row-selection.js';
+import { axisLabel } from './axis-label.js';
 import { setupBoxplotBuilder } from './boxplot-builder.js';
+import { buildBoxplot, drawBoxplot } from './builder-boxplot.js';
+import { buildHistogram, drawHistogram } from './builder-histogram.js';
 import { setupResponseSurfaceDialog, attachSurfaceRotation } from './response-surface-dialog.js';
 import { setupGroupAnalysisDialog } from './group-analysis-dialog.js';
 import { setupGraphLayoutDialog } from './graph-layout-dialog.js';
@@ -11,20 +15,28 @@ import { setupCommandDialog } from './command-dialog.js';
 import { inferColumnType } from './column-types.js';
 import { COLUMN_FORMATS, CURRENCY_FORMATS, columnTypeLabel, customNumberIsRed, formatCellValue, formatLabel, validateCustomNumberPattern } from './column-format.js';
 import { setupSampleDataDialog } from './sample-data-dialog.js';
+import { setupCsvImportDialog } from './csv-import-dialog.js';
 import { appendSampleWorksheet } from './sample-worksheet.js';
 import { columnWindow, VISIBLE_COLUMNS } from './column-window.js';
+import { DEFAULT_PAGE_SIZE, PAGE_VIEW_MODES, validPageSize, worksheetRowsForView, pageNumberForRow } from './worksheet-view.js';
+import { groupedNumber } from './number-display.js';
 import { executeAnalysis } from './analysis-execution.js';
 import { esc, fmt, svgChart, renderAnalysisResult } from './analysis-rendering.js';
 import { wrapResultCharts, applyFigureSizes, measureFigureSizes } from './result-figures.js';
+import { ensureChartLegends, appendLegendToSvgClone, appendExportContext } from './result-legends.js';
+import { highlightScatterPoints, setXLabelAngle, setChartXLabelAngle, setupChartInteractions } from './chart-interactions.js';
+import { parsePlotBound, formatPlotBound, renderScatterWithBounds, preparePlotSettingsButtons } from './plot-settings.js';
+import { applyChartFormatting, readChartFormatting } from './chart-formatting.js';
+import { prepareMovableResults, setupResultDragging } from './result-drag.js';
 import { createResizableLayout } from './layout-resize.js';
 import { parseXML } from './xml-import.js';
 import { parseXLSX } from './xlsx-import.js';
-import { blankWorksheet, COLUMN_ROLE_GROUPS, nextWorksheetName, renameWorksheet, validWorksheet } from './workbook.js';
+import { blankWorksheet, COLUMN_ROLE_GROUPS, nextWorksheetName, renameWorksheet, validWorksheet, visibleWorksheetIndices, moveWorksheet, hideWorksheet, showWorksheet, deleteWorksheet } from './workbook.js';
 import { sortWorksheetRows } from './worksheet-sort.js';
 import { selectRows } from './row-selection.js';
 import { columnsClipboardText, pasteColumns, deleteColumn, deleteRows, insertColumn, insertRow, moveColumn } from './worksheet-structure.js';
 import { saveSession, loadSession } from './session.js';
-import {summary,parseCSV,parseTextFile,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
+import {summary,csvChunks,numeric,MAX_ROWS,MAX_COLUMNS} from './stats.js';
 const $ = id => document.getElementById(id);
 document.querySelector('#analysisDialog .analysis-bar').insertAdjacentHTML('beforeend', '<div class="field" id="capGroupField" hidden><label for="capGroup">Capability subgroup column (optional)</label><select id="capGroup"><option value="">Use individual observations</option></select></div>');
 const names={summary:'Descriptive statistics',histogram:'Histogram',regression:'Linear regression',control:'Individuals control chart','p-chart':'P chart','moving-average':'Moving average','exponential-smoothing':'Single exponential smoothing',capability:'Process capability','one-sample-t':'1-Sample t',correlation:'Correlation','xbar-chart':'Xbar chart','xbar-s-chart':'Xbar-S chart'};
@@ -34,10 +46,11 @@ let worksheets = [{ name: 'Worksheet 1', data, page: 1, scrollLeft: 0 }];
 let activeSheetIndex = 0;
 let columnStart = 0;
 let enterDirection = (() => { try { return localStorage.getItem('jmptab-enter-direction') === 'right' ? 'right' : 'down'; } catch { return 'down'; } })();
+let pageSize = (() => { try { const saved = Number(localStorage.getItem('jmptab-rows-per-page')); return validPageSize(saved) ? saved : DEFAULT_PAGE_SIZE; } catch { return DEFAULT_PAGE_SIZE; } })();
 const activeSheet = () => worksheets[activeSheetIndex];
 const selectedColumns = () => activeSheet().selectedColumns || new Set(activeSheet().selectedColumn == null ? [] : [activeSheet().selectedColumn]);
 const isSelectedColumn = index => selectedColumns().has(index);
-function invalidateReport(){lastReport='';$('results').innerHTML='<div class="empty">No result for this worksheet. Choose numeric columns and run an analysis.</div>';$('resultSubtitle').textContent='No analysis yet';}
+function invalidateReport(){lastReport='';$('results').innerHTML='<div class="empty">No result for this worksheet. Choose numeric columns and run an analysis.</div>';$('resultSubtitle').textContent='No analysis yet';$('scatterDragMode').closest('label').hidden=true;}
 function message(text) {
   const outputError = $('error');
   const dialogError = $('analysisError');
@@ -48,7 +61,6 @@ function message(text) {
   target.hidden = !text;
 }
 function dirty(){if(activeSheet().doe?.model){delete activeSheet().doe.model;document.querySelector('[data-model-badge]')?.remove();}unsaved=true;revision++;$('saveState').textContent='Unsaved changes';$('resultSubtitle').textContent='Worksheet changed · run analysis to refresh';}
-const PAGE_SIZE = 200;
 let page = 1;
 const layout = createResizableLayout({
   workbench: document.querySelector('.workbench'),
@@ -58,59 +70,82 @@ const layout = createResizableLayout({
   paneHandle: $('paneResizer'),
   table: $('worksheet'),
   tableScroll: document.querySelector('.table-scroll'),
-  getWorksheet: () => data
+  getWorksheet: () => data,
+  getPageSize: () => pageSize
 });
 
 function renderSheet() {
   if (data.formats) while (data.formats.length < data.headers.length) data.formats.push('auto');
   if (data.units) while (data.units.length < data.headers.length) data.units.push('');
-  const pageCount = Math.max(1, Math.ceil(data.rows.length / PAGE_SIZE));
+  const mode = PAGE_VIEW_MODES.includes(activeSheet().viewMode) ? activeSheet().viewMode : 'edges';
+  const pageCount = Math.max(1, Math.ceil((mode === 'selected' ? activeSheet().selectedRows?.size || 0 : data.rows.length) / pageSize));
   page = Math.min(page, pageCount);
+  if (mode === 'first' || mode === 'edges') page = 1;
   activeSheet().page = page;
-  const start = (page - 1) * PAGE_SIZE;
   const visible = columnWindow(data.headers.length, columnStart);
   columnStart = visible.first;
   const widths = layout.widthsFor(data.headers.length);
-  const colgroup = '<colgroup><col>' + widths.slice(visible.first, visible.last).map(() => '<col>').join('') + '</colgroup>';
+  const colgroup = '<colgroup><col><col>' + widths.slice(visible.first, visible.last).map(() => '<col>').join('') + '</colgroup>';
   const headers = data.headers.slice(visible.first, visible.last).map((_, offset) => { const index = visible.first + offset; const formula = activeSheet().formulas?.find(item => item.target === data.headers[index]); const format = data.formats?.[index] || 'auto'; const type = ['date', 'time', 'timestamp'].includes(format) ? 'D' : format === 'string' ? 'T' : format === 'auto' ? inferColumnType(data.rows,index) : ''; const role = data.roles?.[index] || ''; const typeLabel = columnTypeLabel(format, type); const model = activeSheet().doe?.model?.response === data.headers[index]; return `<th scope="col" data-column-index="${index}" data-selected-column="${isSelectedColumn(index)}" aria-sort="${activeSheet().sort?.column === index ? activeSheet().sort.direction : 'none'}"><button type="button" class="sort-column" data-sort-column="${index}" aria-label="Select column ${index + 1}, type ${typeLabel}${role ? `, role ${role}` : ''}; Shift-click for range, Ctrl-click to add" aria-pressed="${isSelectedColumn(index)}" title="${formula ? esc(formula.expression) : model ? 'Factorial model stored' : 'Click to select column; Shift-click for range; Ctrl-click to add; right-click for actions'}">C${index + 1}${role ? ` <span class="column-role-badge">${esc(role)}</span>` : ''} <span class="column-type-badge">${esc(typeLabel)}</span>${formula ? ' ƒx' : ''}${model ? ' <span data-model-badge>✓</span>' : ''}${activeSheet().sort?.column === index ? (activeSheet().sort.direction === 'ascending' ? ' ↑' : ' ↓') : ''}</button><button type="button" class="column-resize-handle" data-resize-column="${index}" role="separator" aria-orientation="vertical" aria-label="Resize column ${index + 1}" aria-valuemin="96" aria-valuemax="16384" title="Drag to resize column; double-click to fit text"></button></th>`
   }).join('');
   const names = data.headers.slice(visible.first, visible.last).map((name, offset) => { const column = visible.first + offset; return `<th data-column-index="${column}" data-selected-column="${isSelectedColumn(column)}"><div class="column-heading-fields"><input aria-label="Column ${column + 1} name" data-col="${column}" value="${esc(name)}"><input aria-label="Column ${column + 1} unit (optional)" data-unit="${column}" placeholder="Unit (optional)" maxlength="100" value="${esc(data.units?.[column] || '')}"></div></th>`
   }).join('');
-  const rows = data.rows.slice(start, start + PAGE_SIZE).map((row, offset) => {
-    const index = start + offset;
+  const rows = worksheetRowsForView(data.rows, page, mode, pageSize, activeSheet().selectedRows).map(({ row, index, omitted, first, last }) => {
+    if (omitted) return `<tr class="omitted-rows"><td colspan="${visible.last - visible.first + 2}" role="status">⋯ ${groupedNumber(omitted)} rows hidden (${groupedNumber(first)}–${groupedNumber(last)}). Use Show pages or Go to open them. ⋯</td></tr>`;
     const cells = Array.from({ length: visible.last - visible.first }, (_, offset) => { const column = visible.first + offset; const value = row[column] ?? ''; const format = data.formats?.[column] || 'auto'; const calculated = activeSheet().formulas?.some(item => item.target === data.headers[column]); const red = customNumberIsRed(Number(value), format); return `<td data-column-index="${column}" data-selected-column="${isSelectedColumn(column)}"><input class="${format === 'string' || ['date', 'time', 'timestamp'].includes(format) || numeric(value) === null ? 'text-value' : 'numeric-value'}${red ? ' negative-red' : ''}" aria-label="Row ${index + 1}, ${esc(data.headers[column])}" data-row="${index}" data-col="${column}" value="${esc(formatCellValue(value, format))}"${calculated ? ' readonly title="Calculated column"' : ''}></td>`
     }).join('');
     const selected = activeSheet().selectedRows?.has(index) || false;
-    return `<tr data-selected="${selected}"><td class="row-heading"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}" aria-pressed="${selected}">${(index + 1).toLocaleString('en-US')}</button></td>${cells}</tr>`;
+    const pageNumber = pageNumberForRow(index, pageSize);
+    return `<tr data-selected="${selected}"><td class="page-number-cell" aria-label="Page ${pageNumber}">${pageNumber}</td><td class="row-heading"><button type="button" data-select-row="${index}" aria-label="Select row ${index + 1}${selected ? ', selected' : ''}" aria-pressed="${selected}">${selected ? '<span class="selected-row-star" aria-hidden="true">★</span>' : ''}${groupedNumber(index + 1)}</button></td>${cells}</tr>`;
   }).join('');
-  $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col" class="row-number-heading"><label for="enterDirection">#</label><select id="enterDirection" aria-label="Enter direction" title="Enter moves down or right"><option value="down">↓</option><option value="right">→</option></select></th>${headers}</tr><tr><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
+  $('worksheet').innerHTML = `${colgroup}<thead><tr><th scope="col" class="page-number-heading" title="Page number based on rows per page">Page</th><th scope="col" class="row-number-heading"><label for="enterDirection">#</label><select id="enterDirection" aria-label="Enter direction" title="Enter moves down or right"><option value="down">↓</option><option value="right">→</option></select></th>${headers}</tr><tr><th></th><th></th>${names}</tr></thead><tbody>${rows}</tbody>`;
   if (visible.windowed) $('tableScroll').scrollLeft = 0;
   $('enterDirection').value = enterDirection;
   layout.applyColumnWidths(visible.first, visible.last);
-  $('sheetCount').textContent = `${data.rows.length.toLocaleString('en-US')} rows · ${data.headers.length} columns`;
+  $('sheetCount').textContent = `${groupedNumber(data.rows.length)} rows · ${groupedNumber(data.headers.length)} columns`;
+  updateSheetSelectionControls();
+  $('sheetViewMode').value = mode;
   $('sheetPage').value = page;
   $('sheetPage').max = pageCount;
-  $('pageCount').textContent = 'of ' + pageCount.toLocaleString('en-US');
-  $('previousPage').disabled = page <= 1;
-  $('nextPage').disabled = page >= pageCount;
+  $('sheetPage').disabled = mode === 'first' || mode === 'edges' || pageCount <= 1;
+  $('sheetPage').title = pageCount <= 1 ? 'This worksheet has only one page' : 'Use ↑/↓, the number spinner, or Enter to open a page';
+  const sampledRows = Math.ceil(Math.min(pageSize, Math.max(0, data.rows.length - (page - 1) * pageSize)) * 0.3);
+  $('pageCount').textContent = 'of ' + groupedNumber(pageCount) + (mode === 'sample' ? ` · ${sampledRows} rows sampled` : '');
+  $('pageSizeShortcut').hidden = pageCount > 1 || data.rows.length < 2;
+  $('previousPage').disabled = mode === 'first' || mode === 'edges' || page <= 1;
+  $('nextPage').disabled = mode === 'first' || mode === 'edges' || page >= pageCount;
   renderColumns();
   renderSheetTabs();
   updateHorizontalScroll();
 }
 
+function updateSheetSelectionControls() {
+  const columns = selectedColumns().size;
+  const rows = activeSheet().selectedRows?.size || 0;
+  $('sheetSelectionStatus').textContent = columns ? `${groupedNumber(columns)} column${columns === 1 ? '' : 's'} marked` : activeSheet().viewMode === 'selected' ? `${groupedNumber(rows)} selected ★` : '';
+  $('copySelectedColumns').hidden = columns === 0;
+  $('deselectAll').hidden = !(columns || rows || (activeResult?.sheetName === activeSheet().name && $('results').querySelector('svg.chart[data-selected-bounds]')));
+}
+
 function renderSheetTabs() {
-  $('worksheetTabs').innerHTML = worksheets.map((sheet, index) =>
-    `<button type="button" data-sheet-index="${index}" aria-current="${index === activeSheetIndex}" aria-label="Open ${esc(sheet.name)}" title="Double-click or press F2 to rename">${esc(sheet.name)}</button>`
+  const visible = visibleWorksheetIndices(worksheets);
+  $('worksheetTabs').innerHTML = visible.map(index =>
+    `<button type="button" data-sheet-index="${index}" aria-current="${index === activeSheetIndex}" aria-label="Open ${esc(worksheets[index].name)}" title="Double-click or press F2 to rename; right-click for options">${esc(worksheets[index].name)}</button>`
   ).join('');
-  $('firstSheet').disabled = $('previousSheet').disabled = activeSheetIndex === 0;
-  $('lastSheet').disabled = $('nextSheet').disabled = activeSheetIndex === worksheets.length - 1;
+  const hidden = worksheets.flatMap((sheet, index) => sheet.hidden ? [index] : []);
+  $('hiddenSheetMenu').hidden = hidden.length === 0;
+  $('hiddenSheetMenu').querySelector('summary').textContent = `Hidden (${hidden.length})`;
+  $('hiddenSheetList').innerHTML = hidden.map(index => `<button type="button" data-show-sheet="${index}">Show ${esc(worksheets[index].name)}</button>`).join('');
+  const position = visible.indexOf(activeSheetIndex);
+  $('firstSheet').disabled = $('previousSheet').disabled = position <= 0;
+  $('lastSheet').disabled = $('nextSheet').disabled = position >= visible.length - 1;
   $('graphBuilderSheetName').textContent = activeSheet().name;
   const strip = $('worksheetTabs');
   const selected = strip.querySelector('[aria-current="true"]');
   const stripRect = strip.getBoundingClientRect();
   const selectedRect = selected.getBoundingClientRect();
-  if (selectedRect.left < stripRect.left) strip.scrollLeft += selectedRect.left - stripRect.left;
-  else if (selectedRect.right > stripRect.right) strip.scrollLeft += selectedRect.right - stripRect.right;
+  if (selectedRect?.left < stripRect.left) strip.scrollLeft += selectedRect.left - stripRect.left;
+  else if (selectedRect?.right > stripRect.right) strip.scrollLeft += selectedRect.right - stripRect.right;
 }
 
 function updateHorizontalScroll() {
@@ -133,21 +168,62 @@ function updateHorizontalScroll() {
 }
 
 function showPage(number) {
-  page = Math.max(1, Math.trunc(number) || page);
+  const mode = activeSheet().viewMode || 'edges';
+  if (mode === 'first' || mode === 'edges') return;
+  const count = mode === 'selected' ? activeSheet().selectedRows?.size || 0 : data.rows.length;
+  const candidate = Math.min(Math.max(1, Math.trunc(number) || page), Math.max(1, Math.ceil(count / pageSize)));
+  page = candidate;
   activeSheet().page = page;
   renderSheet();
   document.querySelector('.table-scroll').scrollTop = 0;
 }
+$('sheetViewMode').onchange = () => {
+  activeSheet().viewMode = $('sheetViewMode').value;
+  page = 1;
+  activeSheet().page = 1;
+  renderSheet();
+  $('tableScroll').scrollTop = 0;
+};
 
 $('previousPage').onclick = () => showPage(page - 1);
 $('nextPage').onclick = () => showPage(page + 1);
-$('goToPage').onclick = () => showPage(Number($('sheetPage').value));
 $('sheetPage').onkeydown = event => {
-  if (event.key === 'Enter') $('goToPage').click();
+  if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    event.preventDefault();
+    event.stopPropagation();
+    showPage(page + (event.key === 'ArrowUp' ? 1 : -1));
+    return;
+  }
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  event.stopPropagation();
+  showPage(Number(event.currentTarget.value));
 };
+$('sheetPage').onchange = event => showPage(Number(event.currentTarget.value));
+$('pageSizeSettingsBtn').onclick = () => {
+  $('rowsPerPage').value = pageSize;
+  $('pageSizeDialog').showModal();
+};
+$('pageSizeShortcut').onclick = () => $('pageSizeSettingsBtn').click();
+$('cancelPageSize').onclick = () => $('pageSizeDialog').close();
+$('pageSizeForm').onsubmit = event => {
+  event.preventDefault();
+  const next = Number($('rowsPerPage').value);
+  if (!validPageSize(next)) { $('rowsPerPage').setCustomValidity('Enter a whole number from 1 to 1,000.'); $('rowsPerPage').reportValidity(); return; }
+  $('rowsPerPage').setCustomValidity('');
+  $('pageSizeDialog').close();
+  if (next === pageSize) return;
+  pageSize = next;
+  try { localStorage.setItem('jmptab-rows-per-page', String(pageSize)); } catch { /* Keep the setting for this session. */ }
+  for (const sheet of worksheets) sheet.page = 1;
+  page = 1;
+  renderSheet();
+  $('tableScroll').scrollTop = 0;
+};
+$('rowsPerPage').oninput = () => $('rowsPerPage').setCustomValidity('');
 
 function switchSheet(index) {
-  if (index < 0 || index >= worksheets.length || index === activeSheetIndex) return;
+  if (!Number.isInteger(index) || index < 0 || index >= worksheets.length || worksheets[index].hidden || index === activeSheetIndex) return;
   activeSheet().page = page;
   activeSheet().scrollLeft = $('tableScroll').scrollLeft;
   activeSheet().columnStart = columnStart;
@@ -168,6 +244,21 @@ function switchSheet(index) {
 $('worksheetTabs').onclick = event => {
   const tab = event.target.closest('[data-sheet-index]');
   if (tab) switchSheet(Number(tab.dataset.sheetIndex));
+};
+$('worksheetTabs').oncontextmenu = event => {
+  const tab = event.target.closest('[data-sheet-index]');
+  if (!tab) return;
+  event.preventDefault();
+  openSheetMenu('sheet-tab', Number(tab.dataset.sheetIndex), event.clientX, event.clientY);
+};
+$('hiddenSheetList').onclick = event => {
+  const button = event.target.closest('[data-show-sheet]');
+  if (!button) return;
+  const index = Number(button.dataset.showSheet);
+  showWorksheet(worksheets, index);
+  $('hiddenSheetMenu').open = false;
+  revision++;
+  switchSheet(index);
 };
 function editSheetName(tab) {
   const index = Number(tab.dataset.sheetIndex);
@@ -214,10 +305,10 @@ $('worksheetTabs').onkeydown = event => {
     editSheetName(event.target);
   }
 };
-$('firstSheet').onclick = () => switchSheet(0);
-$('previousSheet').onclick = () => switchSheet(activeSheetIndex - 1);
-$('nextSheet').onclick = () => switchSheet(activeSheetIndex + 1);
-$('lastSheet').onclick = () => switchSheet(worksheets.length - 1);
+$('firstSheet').onclick = () => switchSheet(visibleWorksheetIndices(worksheets)[0]);
+$('previousSheet').onclick = () => { const visible = visibleWorksheetIndices(worksheets); switchSheet(visible[visible.indexOf(activeSheetIndex) - 1]); };
+$('nextSheet').onclick = () => { const visible = visibleWorksheetIndices(worksheets); switchSheet(visible[visible.indexOf(activeSheetIndex) + 1]); };
+$('lastSheet').onclick = () => switchSheet(visibleWorksheetIndices(worksheets).at(-1));
 $('addSheet').onclick = () => {
   if (worksheets.length >= 100) return message('Maximum 100 worksheets per project.');
   worksheets.push(blankWorksheet(nextWorksheetName(worksheets)));
@@ -272,6 +363,32 @@ sheetMenu.addEventListener('click', event => {
   });
 });
 function closeSheetMenu() { sheetMenu.hidden = true; sheetMenu.replaceChildren(); }
+function markWorkbookChanged() {
+  revision++;
+  unsaved = true;
+  $('saveState').textContent = 'Unsaved changes';
+}
+let pendingDeleteSheet = null;
+$('cancelDeleteSheet').onclick = () => $('deleteSheetDialog').close();
+$('confirmDeleteSheet').onclick = () => {
+  const index = pendingDeleteSheet;
+  $('deleteSheetDialog').close();
+  if (!Number.isInteger(index) || !worksheets[index] || worksheets.length <= 1) return;
+  const name = worksheets[index].name;
+  if (index === activeSheetIndex) {
+    if (visibleWorksheetIndices(worksheets).length === 1) {
+      const other = worksheets.findIndex((sheet, position) => position !== index);
+      showWorksheet(worksheets, other);
+    }
+    switchSheet(visibleWorksheetIndices(worksheets).find(position => position !== index));
+  }
+  deleteWorksheet(worksheets, index);
+  if (index < activeSheetIndex) activeSheetIndex--;
+  history = history.filter(result => result.sheetName !== name);
+  markWorkbookChanged();
+  renderSheetTabs();
+  renderHistory();
+};
 function applyColumnFormat(index, format) {
   data.formats ||= Array(data.headers.length).fill('auto');
   const columns = isSelectedColumn(index) ? selectedColumns() : new Set([index]);
@@ -313,6 +430,12 @@ function sortColumn(column, direction) {
   dirty();
   renderSheet();
 }
+async function copyColumns(columns) {
+  try {
+    await navigator.clipboard.writeText(columnsClipboardText(data, columns));
+    message(`Copied ${columns.size} column${columns.size === 1 ? '' : 's'}.`);
+  } catch { message('Clipboard access was denied. Allow clipboard access and try again.'); }
+}
 function changeColumn(index, action) {
   try {
     if (action === 'insert-left') insertColumn(data, index);
@@ -337,14 +460,46 @@ function menuButton(label, action, role = 'menuitem') {
 }
 function openSheetMenu(kind, index, x, y) {
   const buttons = [];
-  if (kind === 'column-context') {
-    buttons.push(menuButton(isSelectedColumn(index) && selectedColumns().size > 1 ? 'Copy selected columns' : 'Copy column', async () => {
+  if (kind === 'sheet-tab') {
+    buttons.push(menuButton('Rename worksheet', () => {
+      closeSheetMenu();
+      editSheetName($('worksheetTabs').querySelector(`[data-sheet-index="${index}"]`));
+    }));
+    for (const [direction, label] of [[-1, 'Move worksheet left'], [1, 'Move worksheet right']]) {
+      const button = menuButton(label, () => {
+        closeSheetMenu();
+        const current = activeSheet();
+        if (!moveWorksheet(worksheets, index, index + direction)) return;
+        activeSheetIndex = worksheets.indexOf(current);
+        markWorkbookChanged();
+        renderSheetTabs();
+      });
+      button.disabled = index + direction < 0 || index + direction >= worksheets.length;
+      buttons.push(button);
+    }
+    const hide = menuButton('Hide worksheet', () => {
       closeSheetMenu();
       try {
-        const columns = isSelectedColumn(index) ? selectedColumns() : new Set([index]);
-        await navigator.clipboard.writeText(columnsClipboardText(data, columns));
-        message(`Copied ${columns.size} column${columns.size === 1 ? '' : 's'}.`);
-      } catch { message('Clipboard access was denied. Allow clipboard access and try again.'); }
+        hideWorksheet(worksheets, index);
+        markWorkbookChanged();
+        if (index === activeSheetIndex) switchSheet(visibleWorksheetIndices(worksheets)[0]);
+        else renderSheetTabs();
+      } catch (error) { message(error.message); }
+    });
+    hide.disabled = visibleWorksheetIndices(worksheets).length <= 1;
+    buttons.push(hide);
+    const remove = menuButton('Delete worksheet…', () => {
+      closeSheetMenu();
+      pendingDeleteSheet = index;
+      $('deleteSheetName').textContent = worksheets[index].name;
+      $('deleteSheetDialog').showModal();
+    });
+    remove.disabled = worksheets.length <= 1;
+    buttons.push(remove);
+  } else if (kind === 'column-context') {
+    buttons.push(menuButton(isSelectedColumn(index) && selectedColumns().size > 1 ? 'Copy selected columns' : 'Copy column', () => {
+      closeSheetMenu();
+      copyColumns(isSelectedColumn(index) ? selectedColumns() : new Set([index]));
     }));
     for (const [action, label] of [['sort-ascending', 'Sort ascending'], ['sort-descending', 'Sort descending']]) {
       buttons.push(menuButton(label, () => { closeSheetMenu(); sortColumn(index, action === 'sort-ascending' ? 'ascending' : 'descending'); }));
@@ -481,13 +636,7 @@ $('worksheet').addEventListener('click', event => {
   sheet.selectionAnchor = result.anchor;
   sheet.selectedColumn = null;
   sheet.selectedColumns = new Set();
-  $('worksheet').querySelectorAll('[data-selected-column="true"]').forEach(cell => { cell.dataset.selectedColumn = 'false'; });
-  $('worksheet').querySelectorAll('[data-sort-column]').forEach(header => { header.setAttribute('aria-pressed', 'false'); });
-  for (const row of $('worksheet').querySelectorAll('tbody tr')) {
-    const selected = result.selected.has(Number(row.querySelector('[data-select-row]').dataset.selectRow));
-    row.dataset.selected = String(selected);
-    row.querySelector('[data-select-row]').setAttribute('aria-pressed', String(selected));
-  }
+  renderSheet();
 });
 $('worksheet').addEventListener('change', event => {
   if (event.target.id !== 'enterDirection') return;
@@ -513,7 +662,18 @@ $('worksheet').addEventListener('click', event => {
     header.setAttribute('aria-pressed', String(result.selected.has(Number(header.dataset.sortColumn))));
   });
   $('worksheet').querySelectorAll('tbody tr[data-selected="true"]').forEach(row => { row.dataset.selected = 'false'; row.querySelector('[data-select-row]').setAttribute('aria-pressed', 'false'); });
+  updateSheetSelectionControls();
 });
+$('markColumns').onclick = () => {
+  const sheet = activeSheet();
+  sheet.selectedColumns = new Set(data.headers.map((_, index) => index));
+  sheet.selectedColumn = null;
+  sheet.columnSelectionAnchor = 0;
+  sheet.selectedRows = new Set();
+  sheet.selectionAnchor = null;
+  renderSheet();
+};
+$('copySelectedColumns').onclick = () => copyColumns(selectedColumns());
 $('worksheet').addEventListener('copy', event => {
   if (!event.target.closest('[data-sort-column]') || !selectedColumns().size) return;
   event.clipboardData.setData('text/plain', columnsClipboardText(data, selectedColumns()));
@@ -641,21 +801,44 @@ function run(record = true) {
       ? 'Quality analysis' : 'Statistical analysis';
     const title = `<div class="result-title"><div><h3>${esc(resultColumn)}</h3><p>${esc(names[type])} · ${esc(activeSheet().name)}</p></div><span class="badge">${badge}</span></div>`;
     const { html, report } = renderAnalysisResult({
-      type, s: result, column, predictorColumn: data.headers[predictorIndex], rowCount: data.rows.length
+      type, s: result, column, predictorColumn: data.headers[predictorIndex], rowCount: data.rows.length,
+      responseAxisLabel: axisLabel(data, responseIndex), predictorAxisLabel: axisLabel(data, predictorIndex)
     });
     const now = new Date();
     lastReport = `jmptab — ${names[type]}\nWorksheet: ${activeSheet().name}\nColumn: ${resultColumn}\nGenerated: ${now.toISOString()}\nWorksheet revision: ${revision}\n\n${report}`;
-    const resultHtml = title + wrapResultCharts(html, document);
-    $('results').innerHTML = resultHtml;
+    $('results').innerHTML = title + wrapResultCharts(html, document);
+    const metricsBox = $('results').querySelector('.metrics');
+    const analysisLabel = $('results').querySelector('.result-title .badge');
+    if (metricsBox && analysisLabel) {
+      const collapsibleMetrics = document.createElement('details');
+      collapsibleMetrics.className = 'metrics';
+      collapsibleMetrics.open = true;
+      collapsibleMetrics.title = 'Drag the lower-right corner to resize; click the heading to hide or show statistics';
+      const heading = document.createElement('summary');
+      heading.className = 'metrics-heading';
+      heading.textContent = analysisLabel.textContent;
+      collapsibleMetrics.append(heading, ...metricsBox.childNodes);
+      metricsBox.replaceWith(collapsibleMetrics);
+      analysisLabel.remove();
+    }
+    prepareMovableResults($('results'));
+    setXLabelAngle($('results'), Number($('xLabelAngle').value));
+    ensureChartLegends($('results'));
+    preparePlotSettingsButtons($('results'));
+    const resultHtml = $('results').innerHTML;
     $('resultSubtitle').textContent = `${names[type]} · ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
     if (record) {
       history.unshift({
         type, column: resultColumn, sheetName: activeSheet().name,
         time: now.toISOString(), html: resultHtml, report: lastReport, revision,
+        observations: result.n,
+        scatterSource: ['regression', 'correlation'].includes(type) ? { xColumn: predictorIndex, yColumn: responseIndex, groupColumn: null, xFormat: data.formats?.[predictorIndex] || 'float', groups: [] } : null,
         command: formatCommand({ type, responseIndex, predictorIndex, options })
       });
       history = history.slice(0, 20);
       activeResult = history[0];
+      $('scatterDragMode').closest('label').hidden = !activeResult.scatterSource;
+      setXLabelAngle($('results'), Number($('xLabelAngle').value));
       renderHistory();
     }
     $('outputScroll').scrollTop = 0;
@@ -676,16 +859,42 @@ function renderHistory() {
     : '<p class="empty">Run an analysis to add a result.</p>';
 }
 
-$('addRow').onclick=()=>{if(data.rows.length>=MAX_ROWS)return message('Maximum 1,048,576 rows.');data.rows.push(data.headers.length <= 30 ? Array(data.headers.length).fill('') : []);if(activeSheet().formulas?.length)try{recalculateFormulas(activeSheet(),[data.rows.length-1]);}catch(error){message(error.message);}dirty();showPage(Math.ceil(data.rows.length / PAGE_SIZE));const scroll=document.querySelector('.table-scroll');scroll.scrollTop=scroll.scrollHeight;};$('addCol').onclick=()=>{if(data.headers.length>=MAX_COLUMNS)return message('Maximum 16,384 columns.');data.headers.push(`Column ${data.headers.length+1}`);data.roles?.push('');dirty();renderSheet();};
+$('addRow').onclick=()=>{if(data.rows.length>=MAX_ROWS)return message('Maximum 1,048,576 rows.');data.rows.push(data.headers.length <= 30 ? Array(data.headers.length).fill('') : []);if(activeSheet().formulas?.length)try{recalculateFormulas(activeSheet(),[data.rows.length-1]);}catch(error){message(error.message);}dirty();showPage(Math.ceil(data.rows.length / pageSize));const scroll=document.querySelector('.table-scroll');scroll.scrollTop=scroll.scrollHeight;};$('addCol').onclick=()=>{if(data.headers.length>=MAX_COLUMNS)return message('Maximum 16,384 columns.');data.headers.push(`Column ${data.headers.length+1}`);data.roles?.push('');dirty();renderSheet();};
 function download(name,content,type){const url=URL.createObjectURL(new Blob(typeof content === "string" ? [content] : content,{type})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 $('exportBtn').onclick=()=>download('worksheet.csv',csvChunks(data),'text/csv;charset=utf-8');$('reportBtn').onclick=()=>lastReport?download('jmptab-report.txt',lastReport,'text/plain;charset=utf-8'):message('Run an analysis before exporting a report.');
+const openCsvImportDialog = setupCsvImportDialog({ onImport: (next, fileName, destination) => {
+  if (destination === 'new') {
+    const appended = appendSampleWorksheet(worksheets, next);
+    worksheets = appended.worksheets;
+    switchSheet(appended.activeSheetIndex);
+  } else if (destination === 'replace') {
+    if (unsaved && !confirm('Replace the current worksheet? Save or export it first to keep your work.')) return false;
+    activeSheet().data = next;
+    data = next;
+    activeSheet().page = 1;
+    activeSheet().scrollLeft = 0;
+    page = 1;
+    history = history.filter(result => result.sheetName !== activeSheet().name);
+    activeResult = null;
+    invalidateReport();
+    renderSheet();
+    renderHistory();
+  } else throw Error('Choose where to import the data.');
+  revision++;
+  unsaved = true;
+  $('saveState').textContent = 'Unsaved changes';
+  $('projectName').textContent = fileName.replace(/\.(csv|txt)$/i, '');
+  message('');
+  return true;
+} });
 $('importBtn').onclick = () => $('file').click();
 $('file').onchange = async event => {
   const file = event.target.files[0];
   if (!file) return;
   try {
     const format = file.name.toLowerCase().endsWith('.xml') ? 'XML' : file.name.toLowerCase().endsWith('.xlsx') ? 'XLSX' : file.name.toLowerCase().endsWith('.txt') ? 'TXT' : 'CSV';
-    const next = format === 'XML' ? parseXML(await file.text()) : format === 'XLSX' ? await parseXLSX(await file.arrayBuffer()) : format === 'TXT' ? parseTextFile(await file.text()) : parseCSV(await file.text());
+    if (format === 'CSV' || format === 'TXT') { await openCsvImportDialog(file); return; }
+    const next = format === 'XML' ? parseXML(await file.text()) : await parseXLSX(await file.arrayBuffer());
     if (unsaved && !confirm(`Replace your unsaved worksheet with this ${format}? Export or save first to keep your work.`)) return;
     data = next;
     activeSheet().data = next;
@@ -708,7 +917,7 @@ $('file').onchange = async event => {
     $('file').value = '';
   }
 };
-const openSampleDataDialog = setupSampleDataDialog({ onGenerate: next => {
+const openSampleDataDialog = setupSampleDataDialog({ onGenerate: (next, type) => {
   const appended = appendSampleWorksheet(worksheets, next);
   worksheets = appended.worksheets;
   switchSheet(appended.activeSheetIndex);
@@ -718,7 +927,23 @@ const openSampleDataDialog = setupSampleDataDialog({ onGenerate: next => {
   $('response').value = '0';
   $('predictor').value = '1';
   updateSettings();
-  run();
+  if (type === 'scatterplot') {
+    const scatter = scatterPoints(next.rows, 0, 1, null, next.formats[0]);
+    const svg = svgChart({ points: scatter.points, bounds: scatter.bounds, xLabel: axisLabel(next, 0), yLabel: axisLabel(next, 1), xFormat: next.formats[0], rectZoom: true });
+    addGraphResult({ title: `${next.headers[1]} vs ${next.headers[0]}`, label: 'Scatterplot', type: 'scatter', column: next.headers[1], svg,
+      observations: scatter.n, scatterSource: { xColumn: 0, yColumn: 1, groupColumn: null, xFormat: next.formats[0], groups: [] },
+      note: `${groupedNumber(scatter.n)} observations${scatter.points.length < scatter.n ? ` · ${groupedNumber(scatter.points.length)} points displayed` : ''}` });
+  } else if (type === 'boxplot') {
+    const options = { layout: 'one-groups', yColumns: [0], groupColumns: [1] };
+    const result = buildBoxplot(next, options);
+    addGraphResult({ title: `Boxplot of ${next.headers[0]}`, label: 'Boxplot', type: 'box', column: next.headers[0],
+      svg: drawBoxplot(result, options, esc), note: `${result.boxCount} boxes · ${groupedNumber(result.observations)} observations` });
+  } else {
+    const options = { columns: [0], overlay: false, group: null, by: [], combinations: false, binCount: 0, percent: false, sameX: false, sameY: false };
+    const plots = buildHistogram(next, options);
+    addGraphResult({ title: `Histogram of ${next.headers[0]}`, label: 'Histogram', type: 'histogram', column: next.headers[0],
+      svg: drawHistogram(plots, { percent: false, legend: false, escape: esc }), note: `${groupedNumber(next.rows.length)} observations plotted` });
+  }
   return true;
 } });
 $('sampleBtn').onclick = openSampleDataDialog;
@@ -921,7 +1146,9 @@ function addGraphResult(graph) {
   const report = ['jmptab — ' + graph.label, 'Worksheet: ' + activeSheet().name, graph.title, graph.note, 'Worksheet revision: ' + revision].join('\n');
   history.unshift({ type: graph.type, label: graph.label, column: graph.column,
     sheetName: activeSheet().name, html, report, revision, surface: graph.surface,
-    graphTitle: graph.title, graphNote: graph.note, graphSvg: graph.svg });
+    graphTitle: graph.title, graphNote: graph.note, graphSvg: graph.svg,
+    scatterSource: graph.scatterSource,
+    observations: graph.observations ?? (Number(String(graph.note || '').replaceAll(' ', '').match(/([\d,]+)observations/)?.[1]?.replaceAll(',', '')) || undefined) });
   history = history.slice(0, 20);
   showResult(history[0]);
   renderHistory();
@@ -936,12 +1163,162 @@ function graphResultHtml(title, label, sheetName, svg, noteText) {
 function showResult(result) {
   activeResult = result;
   $('results').innerHTML = result.html;
+  $('scatterDragMode').closest('label').hidden = !result.scatterSource;
+  prepareMovableResults($('results'));
+  setXLabelAngle($('results'), Number($('xLabelAngle').value));
+  ensureChartLegends($('results'));
+  preparePlotSettingsButtons($('results'));
   applyFigureSizes($('results'), result.figureSizes || (result.figureSize ? [result.figureSize] : null));
   attachSurfaceRotation($('results'), result);
   lastReport = result.report;
   $('resultSubtitle').textContent = (result.label || names[result.type]) + ' · worksheet revision ' + result.revision;
   $('outputScroll').scrollTop = 0;
 }
+function resampleActiveScatter(bounds) {
+  const source = activeResult?.scatterSource;
+  const sheet = worksheets.find(item => item.name === activeResult?.sheetName);
+  if (!source || !sheet) { message('Original scatterplot data is unavailable. Recreate the graph.'); return null; }
+  if (activeResult.revision !== revision) { message('Worksheet data has changed. Recreate the graph before zooming.'); return null; }
+  const sample = scatterPoints(sheet.data.rows, source.xColumn, source.yColumn, source.groupColumn, source.xFormat, bounds);
+  if (source.groupColumn !== null) for (const point of sample.points) point[3] = SCATTER_GROUP_COLORS[source.groups.indexOf(point[4])] || SCATTER_GROUP_COLORS[0];
+  message('');
+  return sample;
+}
+function selectActiveScatterRows(bounds) {
+  const source = activeResult?.scatterSource;
+  const targetIndex = worksheets.findIndex(sheet => sheet.name === activeResult?.sheetName);
+  if (!source || targetIndex < 0 || activeResult.revision !== revision) {
+    message('Worksheet data has changed. Recreate the scatterplot before selecting rows.');
+    return null;
+  }
+  const sheet = worksheets[targetIndex];
+  const selected = scatterRowsInBounds(sheet.data.rows, source, bounds);
+  sheet.selectedRows = selected;
+  sheet.selectionAnchor = selected.size ? selected.values().next().value : null;
+  sheet.viewMode = 'selected';
+  sheet.page = 1;
+  if (targetIndex !== activeSheetIndex) switchSheet(targetIndex);
+  else { page = 1; renderSheet(); }
+  $('tableScroll').scrollTop = 0;
+  message('');
+  return selected;
+}
+$('deselectAll').onclick = () => {
+  const sheet = activeSheet();
+  sheet.selectedRows = new Set();
+  sheet.selectionAnchor = null;
+  sheet.selectedColumns = new Set();
+  sheet.selectedColumn = null;
+  sheet.columnSelectionAnchor = null;
+  if (sheet.viewMode === 'selected') { sheet.viewMode = 'edges'; sheet.page = page = 1; }
+  for (const result of history) {
+    if (result.sheetName !== sheet.name || !result.html?.includes('data-selected-bounds')) continue;
+    const container = result === activeResult ? $('results') : document.createElement('div');
+    if (result !== activeResult) container.innerHTML = result.html;
+    for (const svg of container.querySelectorAll('svg.chart[data-selected-bounds]')) highlightScatterPoints(svg, null);
+    result.html = container.innerHTML;
+  }
+  renderSheet();
+};
+setupChartInteractions($('results'), () => {
+  if (activeResult) activeResult.html = $('results').innerHTML;
+  updateSheetSelectionControls();
+}, resampleActiveScatter, selectActiveScatterRows);
+$('scatterDragMode').addEventListener('change', () => setXLabelAngle($('results'), Number($('xLabelAngle').value)));
+$('xLabelAngle').addEventListener('change', () => {
+  for (const svg of $('results').querySelectorAll('svg.chart')) delete svg.dataset.xLabelAngle;
+  setXLabelAngle($('results'), Number($('xLabelAngle').value));
+  if (activeResult) activeResult.html = $('results').innerHTML;
+});
+let selectedPlot = null;
+$('results').addEventListener('click', event => {
+  const button = event.target.closest('[data-plot-settings]');
+  if (!button) return;
+  selectedPlot = button.closest('.graph-result-figure')?.querySelector('svg.chart') || null;
+  if (!selectedPlot) return;
+  const isScatter = selectedPlot.hasAttribute('data-rect-zoom');
+  const supportsElements = Boolean(selectedPlot.querySelector('.chart-x-title'));
+  for (const field of $('plotSettingsDialog').querySelectorAll('.plot-common-field')) field.hidden = !supportsElements;
+  const model = isScatter ? JSON.parse(decodeURIComponent(selectedPlot.dataset.rectZoom)) : null;
+  const supportsTrend = Boolean(model && !activeResult?.scatterSource?.groups?.length);
+  for (const field of $('plotSettingsDialog').querySelectorAll('.plot-trend-field')) field.hidden = !supportsTrend;
+  $('plotTrendline').checked = Boolean(model?.fit);
+  const formatting = readChartFormatting(selectedPlot);
+  $('plotXAxis').checked = formatting.xAxis;
+  $('plotYAxis').checked = formatting.yAxis;
+  $('plotLegend').checked = formatting.legend;
+  $('plotLegendPosition').value = formatting.legendPosition;
+  $('plotGridlines').checked = formatting.gridlines;
+  $('plotXTitle').checked = formatting.xTitle;
+  $('plotYTitle').checked = formatting.yTitle;
+  $('plotXTitleText').value = formatting.xTitleText || selectedPlot.querySelector('.chart-x-title')?.textContent || '';
+  $('plotYTitleText').value = formatting.yTitleText || selectedPlot.querySelector('.chart-y-title')?.textContent || '';
+  $('plotDataLabels').checked = formatting.dataLabels;
+  $('plotXAngle').value = selectedPlot.dataset.xLabelAngle ?? $('xLabelAngle').value;
+  for (const field of $('plotSettingsDialog').querySelectorAll('.plot-scale-field')) field.hidden = !isScatter;
+  if (isScatter) {
+    const bounds = JSON.parse(decodeURIComponent(selectedPlot.dataset.axisBounds));
+    const model = JSON.parse(decodeURIComponent(selectedPlot.dataset.rectZoom));
+    $('plotFixedScale').checked = selectedPlot.hasAttribute('data-fixed-axes');
+    for (const [id, value] of [['plotXMin', bounds.xmin], ['plotXMax', bounds.xmax], ['plotYMin', bounds.ymin], ['plotYMax', bounds.ymax]])
+      $(id).value = formatPlotBound(value, id.startsWith('plotX') ? model.xFormat : null);
+  }
+  $('plotSettingsError').hidden = true;
+  $('plotSettingsDialog').showModal();
+});
+$('plotSettingsCancel').onclick = () => $('plotSettingsDialog').close();
+$('plotSettingsForm').addEventListener('submit', event => {
+  event.preventDefault();
+  if (!selectedPlot?.isConnected) return;
+  try {
+    const angle = Number($('plotXAngle').value);
+    if (!Number.isInteger(angle) || angle < -90 || angle > 90) throw new Error('X label angle must be from −90° to 90°.');
+    const formatting = {
+      xAxis: $('plotXAxis').checked, yAxis: $('plotYAxis').checked,
+      gridlines: $('plotGridlines').checked, xTitle: $('plotXTitle').checked, yTitle: $('plotYTitle').checked,
+      xTitleText: $('plotXTitleText').value, yTitleText: $('plotYTitleText').value,
+      dataLabels: $('plotDataLabels').checked, legend: $('plotLegend').checked,
+      legendPosition: $('plotLegendPosition').value
+    };
+    let chart = selectedPlot;
+    if (chart.hasAttribute('data-rect-zoom')) {
+      const model = JSON.parse(decodeURIComponent(chart.dataset.rectZoom));
+      const bounds = $('plotFixedScale').checked ? {
+        xmin: parsePlotBound($('plotXMin').value, model.xFormat), xmax: parsePlotBound($('plotXMax').value, model.xFormat),
+        ymin: parsePlotBound($('plotYMin').value), ymax: parsePlotBound($('plotYMax').value)
+      } : null;
+      const sample = resampleActiveScatter(bounds);
+      if (!sample) throw new Error('Recreate the scatterplot before changing its scale.');
+      let fit = null;
+      if ($('plotTrendline').checked) {
+        const source = activeResult.scatterSource;
+        const sheet = worksheets.find(item => item.name === activeResult.sheetName);
+        fit = model.fit || scatterTrendline(sheet.data.rows, source.xColumn, source.yColumn, source.xFormat);
+      }
+      const replacement = renderScatterWithBounds(chart, bounds, sample.points, fit);
+      if (chart.dataset.selectedBounds) highlightScatterPoints(replacement, JSON.parse(decodeURIComponent(chart.dataset.selectedBounds)));
+      if ($('plotDataLabels').checked && sample.points.length > 50) throw new Error('Data labels need 50 or fewer visible marks. Zoom in or hide data labels.');
+      const previousLegend = chart.nextElementSibling;
+      chart.replaceWith(replacement);
+      if (previousLegend?.classList.contains('chart-legend')) previousLegend.remove();
+      chart = replacement;
+      ensureChartLegends($('results'));
+    }
+    applyChartFormatting(chart, formatting);
+    for (const plot of chart.closest('.graph-result-figure')?.querySelectorAll('svg.chart') || [chart]) setChartXLabelAngle(plot, angle);
+    if (activeResult) {
+      activeResult.html = $('results').innerHTML;
+      if (activeResult.graphSvg?.trimStart().startsWith('<svg')) activeResult.graphSvg = chart.outerHTML;
+    }
+    $('plotSettingsDialog').close();
+  } catch (error) {
+    $('plotSettingsError').textContent = error.message;
+    $('plotSettingsError').hidden = false;
+  }
+});
+setupResultDragging($('results'), () => {
+  if (activeResult) activeResult.html = $('results').innerHTML;
+});
 $('results').addEventListener('pointerup', event => {
   const figure = event.target.closest('.graph-result-figure');
   if (!figure || !activeResult) return;
@@ -1023,16 +1400,16 @@ $('results').addEventListener('click', event => {
   if (!event.target.closest('[data-export-graph]')) return;
   const charts = [...$('results').querySelectorAll('svg.chart')];
   if (!charts.length) return;
-  let exportChart = charts[0].cloneNode(true);
+  let exportChart = appendLegendToSvgClone(charts[0], charts[0].cloneNode(true));
   if (charts.length > 1) {
     const namespace = 'http://www.w3.org/2000/svg';
     exportChart = document.createElementNS(namespace, 'svg');
-    const widths = charts.map(chart => Number(chart.viewBox.baseVal.width));
-    const heights = charts.map(chart => Number(chart.viewBox.baseVal.height));
+    const panels = charts.map(chart => appendLegendToSvgClone(chart, chart.cloneNode(true)));
+    const widths = panels.map(chart => Number(chart.viewBox.baseVal.width));
+    const heights = panels.map(chart => Number(chart.viewBox.baseVal.height));
     exportChart.setAttribute('viewBox', `0 0 ${Math.max(...widths)} ${heights.reduce((sum, height) => sum + height, 0)}`);
     let y = 0;
-    charts.forEach((chart, index) => {
-      const panel = chart.cloneNode(true);
+    panels.forEach((panel, index) => {
       panel.setAttribute('x', '0');
       panel.setAttribute('y', String(y));
       panel.setAttribute('width', String(widths[index]));
@@ -1041,13 +1418,8 @@ $('results').addEventListener('click', event => {
       y += heights[index];
     });
   }
-  exportChart.setAttribute('font-family', 'Segoe UI, sans-serif');
-  exportChart.setAttribute('font-size', '10');
   const heading = $('results').querySelector('h3').textContent;
-  const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
-  title.textContent = heading;
-  exportChart.querySelector('title')?.remove();
-  exportChart.prepend(title);
+  exportChart = appendExportContext(exportChart, { title: heading, sheetName: activeResult?.sheetName || activeSheet().name, observations: activeResult?.observations });
   download('jmptab-graph.svg', new XMLSerializer().serializeToString(exportChart), 'image/svg+xml');
 });
 $('graphEditCancel').onclick = () => $('graphEditDialog').close();

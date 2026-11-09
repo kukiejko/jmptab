@@ -1,5 +1,8 @@
 import { chartObservations, numeric, regression, summary } from './stats.js';
 import { buildHistogram, drawHistogram } from './builder-histogram.js';
+import { groupedNumber } from './number-display.js';
+import { axisLabel } from './axis-label.js';
+import { ensureChartLegends } from './result-legends.js';
 
 const candidates = [
   { id: 'gallery', label: 'Gallery', icon: 'M3 3h5v5H3zm9 0h5v5h-5zM3 12h5v5H3zm9 0h5v5h-5z' },
@@ -11,6 +14,7 @@ const candidates = [
 ];
 const labels = Object.fromEntries(candidates.map(({ id, label }) => [id, label]));
 const POINT_LIMIT = 800;
+export const SCATTER_GROUP_COLORS = ['#3975dc','#bf4848','#25856e','#8b59ab','#d47434','#587d2c','#346c88','#915b3d'];
 const $ = id => document.getElementById(id);
 
 function icon(path) {
@@ -25,7 +29,7 @@ function boxSvg(stats, escape) {
   const right = max === min ? middle : scale(q3);
   const low = max === min ? middle : scale(min);
   const high = max === min ? middle : scale(max);
-  const format = value => escape(value.toLocaleString('en-US', { maximumSignificantDigits: 7 }));
+  const format = value => escape(groupedNumber(value, { maximumSignificantDigits: 7 }));
   return `<svg class="chart" viewBox="0 0 600 190" role="img" aria-label="Boxplot with minimum and maximum whiskers">
     <line x1="${low}" y1="79" x2="${high}" y2="79" stroke="#416186"/>
     <path d="M${low} 65v28M${high} 65v28" stroke="#416186"/>
@@ -67,13 +71,14 @@ function barSvg(entries, escape) {
     const width = count / max * 385;
     const short = label.length > 21 ? label.slice(0, 20) + '…' : label;
     return `<text x="131" y="${y + 12}" text-anchor="end">${escape(short)}</text>
-      <rect x="140" y="${y}" width="${width}" height="17" fill="#5c89d0"><title>${escape(label)} · ${count.toLocaleString('en-US')}</title></rect>
-      <text x="${148 + width}" y="${y + 12}">${count.toLocaleString('en-US')}</text>`;
+      <rect x="140" y="${y}" width="${width}" height="17" fill="#5c89d0"><title>${escape(label)} · ${groupedNumber(count)}</title></rect>
+      <text x="${148 + width}" y="${y + 12}">${groupedNumber(count)}</text>`;
   }).join('');
   return `<svg class="chart" viewBox="0 0 600 ${height}" role="img" aria-label="Category frequency bar chart">${bars}</svg>`;
 }
 
-export function scatterPoints(rows, xColumn, yColumn, groupColumn = null) {
+export function scatterPoints(rows, xColumn, yColumn, groupColumn = null, xFormat = 'float', visibleBounds = null) {
+  const xValue = value => xFormat === 'date' || xFormat === 'timestamp' ? (Number.isFinite(Date.parse(value)) ? Date.parse(value) : null) : numeric(value);
   let count = 0;
   const groupCounts = new Map();
   let xmin = Infinity;
@@ -81,9 +86,10 @@ export function scatterPoints(rows, xColumn, yColumn, groupColumn = null) {
   let ymin = Infinity;
   let ymax = -Infinity;
   for (const row of rows) {
-    const x = numeric(row[xColumn]);
+    const x = xValue(row[xColumn]);
     const y = numeric(row[yColumn]);
-    if (x === null || y === null || (groupColumn !== null && !String(row[groupColumn] ?? '').trim())) continue;
+    if (x === null || y === null || (groupColumn !== null && !String(row[groupColumn] ?? '').trim()) ||
+      (visibleBounds && (x < visibleBounds.xmin || x > visibleBounds.xmax || y < visibleBounds.ymin || y > visibleBounds.ymax))) continue;
     count++;
     if (groupColumn !== null) {
       const name = String(row[groupColumn]);
@@ -95,16 +101,20 @@ export function scatterPoints(rows, xColumn, yColumn, groupColumn = null) {
     ymin = Math.min(ymin, y);
     ymax = Math.max(ymax, y);
   }
-  if (!count) throw Error('Choose two columns with complete numeric pairs.');
+  if (!count) {
+    if (visibleBounds) return { points: [], n: 0, groups: [], bounds: visibleBounds };
+    throw Error('Choose two columns with complete numeric pairs.');
+  }
   const points = [];
   const take = Math.min(count, POINT_LIMIT);
   let index = 0;
   const groupSeen = new Map(), groupTaken = new Map();
   const perGroup = groupColumn === null ? 0 : Math.max(1, Math.floor(POINT_LIMIT/groupCounts.size));
   for (const row of rows) {
-    const x = numeric(row[xColumn]);
+    const x = xValue(row[xColumn]);
     const y = numeric(row[yColumn]);
-    if (x === null || y === null || (groupColumn !== null && !String(row[groupColumn] ?? '').trim())) continue;
+    if (x === null || y === null || (groupColumn !== null && !String(row[groupColumn] ?? '').trim()) ||
+      (visibleBounds && (x < visibleBounds.xmin || x > visibleBounds.xmax || y < visibleBounds.ymin || y > visibleBounds.ymax))) continue;
     const name = groupColumn === null ? '' : String(row[groupColumn]);
     if (groupColumn === null) {
       if (index === Math.round(points.length * (count - 1) / Math.max(1, take - 1))) points.push([x, y, false, null, name]);
@@ -120,6 +130,27 @@ export function scatterPoints(rows, xColumn, yColumn, groupColumn = null) {
     index++;
   }
   return { points, n: count, groups: [...groupCounts.keys()], bounds: { xmin, xmax, ymin, ymax } };
+}
+
+export function scatterTrendline(rows, xColumn, yColumn, xFormat = 'float') {
+  let n = 0, meanX = 0, meanY = 0, sumXX = 0, sumXY = 0;
+  let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+  for (const row of rows) {
+    const x = xFormat === 'date' || xFormat === 'timestamp' ? Date.parse(row[xColumn]) : numeric(row[xColumn]);
+    const y = numeric(row[yColumn]);
+    if (!Number.isFinite(x) || y === null) continue;
+    n++;
+    const dx = x - meanX, dy = y - meanY;
+    meanX += dx / n;
+    meanY += dy / n;
+    sumXX += dx * (x - meanX);
+    sumXY += dx * (y - meanY);
+    xmin = Math.min(xmin, x); xmax = Math.max(xmax, x);
+    ymin = Math.min(ymin, y); ymax = Math.max(ymax, y);
+  }
+  if (n < 2 || sumXX === 0) throw new Error('A linear trendline needs at least two distinct X values.');
+  const slope = sumXY / sumXX;
+  return { xmin, xmax, ymin, ymax, slope, intercept: meanY - slope * meanX };
 }
 
 export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxplot }) {
@@ -166,8 +197,8 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
       histogramResult = {
         svg: drawHistogram(plots, { percent: options.percent, legend: options.group !== null || options.overlay, normalFit: options.normalFit, escape }),
         note: plots.length === 1
-          ? plots[0].n.toLocaleString('en-US') + ' observations plotted'
-          : plots.length + ' histograms · ' + plots.reduce((total, panel) => total + panel.n, 0).toLocaleString('en-US') + ' observations plotted across panels'
+          ? groupedNumber(plots[0].n) + ' observations plotted'
+          : plots.length + ' histograms · ' + groupedNumber(plots.reduce((total, panel) => total + panel.n, 0)) + ' observations plotted across panels'
       };
       histogramKey = key;
     }
@@ -188,6 +219,7 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
     let svg;
     let n;
     let shown;
+    let scatterSource;
     const numericSummary = () => cached('summary:' + y, () => summary(rows.map(row => row[y])));
     if (type === 'box') {
       const stats = numericSummary();
@@ -201,25 +233,23 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
       if (xField.value === '' || x === y) throw Error('Choose a different X column for the scatterplot.');
       const groupIndex = !thumbnail && group.value !== '' ? Number(group.value) : null;
       if (groupIndex !== null && [x, y].includes(groupIndex)) throw Error('Choose a separate grouping column.');
-      const scatter = cached('scatter:' + x + ':' + y + ':' + groupIndex, () => scatterPoints(rows, x, y, groupIndex));
+      const xFormat = data.formats?.[x] || 'float';
+      const temporal = xFormat === 'date' || xFormat === 'timestamp';
+      const scatter = cached('scatter:' + x + ':' + y + ':' + groupIndex, () => scatterPoints(rows, x, y, groupIndex, xFormat));
+      scatterSource = { xColumn: x, yColumn: y, groupColumn: groupIndex, xFormat, groups: scatter.groups };
       n = scatter.n;
       const fit = $('gbFit').checked && !thumbnail
-        ? cached('fit:' + x + ':' + y, () => regression(rows.map(row => row[x]), rows.map(row => row[y]), POINT_LIMIT))
+        ? cached('fit:' + x + ':' + y, () => regression(rows.map(row => temporal ? Date.parse(row[x]) : row[x]), rows.map(row => row[y]), POINT_LIMIT))
         : null;
       const points = thumbnail && scatter.points.length > 100 ? scatter.points.filter((_, index) => index % 8 === 0) : scatter.points;
       shown = points.length;
       if (groupIndex !== null) {
         const groups = scatter.groups;
-        const palette = ['#3975dc','#bf4848','#25856e','#8b59ab','#d47434','#587d2c','#346c88','#915b3d'];
+        const palette = SCATTER_GROUP_COLORS;
         if (groups.length > palette.length) throw Error('Scatterplot supports at most eight visible groups.');
         for (const point of points) point[3] = palette[groups.indexOf(point[4])];
       }
-      svg = drawChart({ points, fit, bounds: scatter.bounds, xLabel: xName, yLabel: yName });
-      if (groupIndex !== null) {
-        const groups = scatter.groups;
-        const palette = ['#3975dc','#bf4848','#25856e','#8b59ab','#d47434','#587d2c','#346c88','#915b3d'];
-        svg = svg.replace('</svg>', `<g>${groups.map((name, index) => `<circle cx="50" cy="${20 + index*18}" r="4" fill="${palette[index]}"/><text x="62" y="${24 + index*18}">${escape(name)}</text>`).join('')}</g></svg>`);
-      }
+      svg = drawChart({ points, fit, bounds: scatter.bounds, xLabel: axisLabel(data, x), yLabel: axisLabel(data, y), xFormat: temporal ? xFormat : undefined, rectZoom: true });
     } else {
       const series = cached('series:' + y, () => {
         const values = [];
@@ -239,8 +269,8 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
       shown = points.length;
       svg = drawChart({ points, connect: true, xLabel: 'Worksheet row', yLabel: yName });
     }
-    const note = n.toLocaleString('en-US') + ' observations' + (shown && shown < n ? ' · ' + shown.toLocaleString('en-US') + ' points displayed' : '');
-    return { title, svg, note, type, column: yName, label: labels[type] };
+    const note = groupedNumber(n) + ' observations' + (shown && shown < n ? ' · ' + groupedNumber(shown) + ' points displayed' : '');
+    return { title, svg, note, type, column: yName, label: labels[type], scatterSource, observations: n };
   }
 
   function render() {
@@ -287,6 +317,7 @@ export function setupGraphBuilder({ getData, drawChart, escape, onCreate, onBoxp
     try {
       preview = graph(active);
       canvas.innerHTML = `<article class="gb-document"><h3>${escape(preview.title)}</h3>${preview.svg}<p>${escape(preview.note)}</p></article>`;
+      ensureChartLegends(canvas);
       $('gbStatus').textContent = preview.note;
       apply.disabled = false;
     } catch (error) {

@@ -4,7 +4,7 @@ export function wrapResultCharts(html, document) {
   template.content.querySelectorAll('svg.chart').forEach((chart, index) => {
     if (chart.closest('.graph-result-figure')) return;
     const figure = document.createElement('div');
-    figure.className = 'graph-result-figure';
+    figure.className = 'graph-result-figure analysis-figure';
     figure.setAttribute('role', 'group');
     figure.setAttribute('aria-label', `Resizable graph ${index + 1}`);
     figure.title = 'Drag the lower-right corner to resize';
