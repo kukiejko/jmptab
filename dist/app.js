@@ -1129,13 +1129,18 @@ function formatRolloutTime(deployedAt) {
 
 async function loadReleaseInfo() {
   try {
-    const [infoResponse, notesResponse] = await Promise.all([
-      fetch('/app-info.json', { cache: 'no-store' }),
-      fetch('/release-notes.json', { cache: 'no-store' })
-    ]);
-    if (!infoResponse.ok || !notesResponse.ok) throw Error('Release information is unavailable.');
-    const { version, deployedAt } = await infoResponse.json();
-    const notes = await notesResponse.json();
+    let info, notes;
+    if (globalThis.__JMPTAB_RELEASE__) {
+      ({ info, notes } = globalThis.__JMPTAB_RELEASE__);
+    } else {
+      const [infoResponse, notesResponse] = await Promise.all([
+        fetch('/app-info.json', { cache: 'no-store' }),
+        fetch('/release-notes.json', { cache: 'no-store' })
+      ]);
+      if (!infoResponse.ok || !notesResponse.ok) throw Error('Release information is unavailable.');
+      [info, notes] = await Promise.all([infoResponse.json(), notesResponse.json()]);
+    }
+    const { version, deployedAt } = info;
     if (!version || !Array.isArray(notes)) throw Error('Release information is invalid.');
     const rolloutTime = formatRolloutTime(deployedAt);
     $('appVersion').textContent = version;
@@ -1514,4 +1519,4 @@ async function restoreWorkspace() {
   else run();
 }
 
-await restoreWorkspace();
+void restoreWorkspace();

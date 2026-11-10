@@ -4,7 +4,9 @@ A working, independent statistical analysis application inspired by the workflow
 
 ## Run locally
 
-Requires Node.js 22 or newer. No dependencies or installation needed.
+There are two ways to run jmptab:
+
+**With Node.js (development):** Install Node.js 22 or newer, then run:
 
 ```powershell
 npm start
@@ -12,6 +14,8 @@ npm start
 
 Open http://127.0.0.1:4173. Use Stat or Graph to open an analysis dialog, then select a result in the Navigator to revisit it. Run `npm test` for calculation and import tests.
 If port 4173 is in use, run `npm start -- 4174` and open http://127.0.0.1:4174 instead.
+
+**Without Node.js (single file):** Open [standalone/jmptab.html](standalone/jmptab.html) directly in a browser. You can copy just that file to another laptop. To rebuild it after source changes, run `npm install` once and then `npm run build:standalone` on the development machine. The standalone Help menu shows the version and build time embedded in that file; the Node version shows the local server start time. Saved sessions stay in the browser profile and may be separate between the two launch modes.
 
 Choose **Graph → Boxplot** or select Boxplot in Graph Builder. Pick one of four layouts, choose numeric Y columns and up to four categorical grouping columns, then use **Scale**, **Labels**, **Data View**, **Multiple Graphs**, and **Data Options** for axes, annotations, visual layers, paneling, and a temporary row filter. Generate adds the chart to session results. Hover or focus a box for quartiles, IQR, whiskers, and sample size; hover an outlier star for its value.
 
