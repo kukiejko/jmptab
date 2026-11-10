@@ -19,6 +19,7 @@ export function applyFigureSizes(container, sizes) {
   container.querySelectorAll('.graph-result-figure').forEach((figure, index) => {
     const size = sizes[index];
     if (!size) return;
+    figure.classList.add('manual-figure-size');
     figure.style.width = `${size.width}px`;
     figure.style.height = `${size.height}px`;
   });

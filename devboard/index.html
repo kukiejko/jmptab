@@ -13,6 +13,11 @@
     button { padding: 7px 12px; border: 1px solid #6f91b7; border-radius: 5px; background: #e8f1fa; color: #143a65; cursor: pointer; }
     button:hover { background: #d6e8fa; } button.danger { background: #fff0ee; color: #9a332d; }
     .meta, small { color: #52677e; } .panel { margin-top: 16px; }
+    .agent-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+    .agent { border: 1px solid #d0deeb; border-radius: 6px; padding: 11px 12px; }
+    .agent strong { display: block; font-size: 16px; }
+    .agent .role { color: #315b89; font-weight: 600; }
+    .agent p { margin: 7px 0 0; line-height: 1.4; }
     .lanes { display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
     .card { border: 1px solid #d0deeb; border-radius: 6px; padding: 12px; margin-top: 10px; overflow-wrap: anywhere; }
     .card strong { display: block; margin-bottom: 5px; }
@@ -28,12 +33,14 @@
 <body>
   <header><div><h1>jmptab · devboard</h1><div id="meta" class="meta"></div></div><div><span id="status"></span> <button id="pause"></button></div></header>
   <p id="error" role="alert"></p>
+  <section class="panel" aria-labelledby="agentsTitle"><h2 id="agentsTitle">Agenci i funkcje</h2><div id="agents" class="agent-list"></div></section>
   <section class="panel"><h2>Testy</h2><div id="testText">Brak uruchomionych testów</div><progress id="progress" value="0" max="1"></progress><small id="current"></small></section>
   <main class="lanes" id="lanes"></main>
   <section class="panel"><h2>Ostatnie zdarzenia</h2><ol id="events"></ol></section>
   <script>
     const groups = [['todo','Do zrobienia'],['in_progress','W toku'],['waiting','Czeka na akceptację'],['done','Zakończone'],['open','Otwarte']];
     const $ = (id) => document.getElementById(id);
+    let agentByRole = new Map();
     function el(tag, content, cls) { const node = document.createElement(tag); node.textContent = content; if (cls) node.className = cls; return node; }
     async function act(path, body) {
       try {
@@ -45,7 +52,8 @@
     }
     function card(task) {
       const node = el('article', '', 'card');
-      node.append(el('strong', task.title), el('small', `${task.id} · ${task.agent || 'brak roli'}`));
+      const agent = agentByRole.get(task.agent);
+      node.append(el('strong', task.title), el('small', `${task.id} · ${agent ? `${agent.name} (${agent.role})` : task.agent || 'brak roli'}`));
       if (task.big) node.append(el('span', 'duża zmiana', 'badge'));
       if (task.status === 'approved' || task.status === 'rejected') node.append(el('span', task.status, 'badge'));
       if (task.restore) node.append(el('span', task.restore, 'badge'));
@@ -62,6 +70,13 @@
       try {
         const response = await fetch('/api/state'); if (!response.ok) throw new Error('Nie można pobrać stanu');
         const state = await response.json();
+        agentByRole = new Map((state.agents || []).map((agent) => [agent.id, agent]));
+        $('agents').replaceChildren(...(state.agents || []).map((agent) => {
+          const node = el('article', '', 'agent');
+          const assigned = state.tasks.filter((task) => task.agent === agent.id).length;
+          node.append(el('strong', agent.name), el('span', agent.role, 'role'), el('p', agent.function), el('small', `Zadania: ${assigned}`));
+          return node;
+        }));
         $('meta').textContent = `Wersja ${state.version} · panel uruchomiony ${new Date(state.startedAt).toLocaleString()} · zadań ${state.tasks.length}`;
         $('status').textContent = state.paused ? 'Wstrzymane' : 'Praca trwa'; $('status').className = state.paused ? 'paused' : '';
         $('pause').textContent = state.paused ? 'Wznów' : 'Pauza'; $('pause').onclick = () => act('/api/pause', { paused: !state.paused });

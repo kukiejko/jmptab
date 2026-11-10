@@ -1,14 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { appendEvent, readJson, root, setPaused, stateDir, writeJson } from './state.mjs';
+import { agentByRole } from './agents.mjs';
 
 const statuses = new Set(['todo', 'approved', 'in_progress', 'waiting', 'done', 'rejected', 'open']);
-const roles = new Set(['owner', 'lead', 'product', 'architect', 'developer', 'ux', 'tester', 'security', 'maintainer']);
 
 export function validateTask(task) {
   if (!task || typeof task !== 'object' || !/^[a-z0-9][a-z0-9-]{0,63}$/.test(task.id)) throw new Error('Invalid task id');
   if (typeof task.title !== 'string' || !task.title.trim() || task.title.length > 200) throw new Error('Invalid title');
   if (!statuses.has(task.status)) throw new Error('Invalid task status');
-  if (task.agent != null && !roles.has(task.agent)) throw new Error('Invalid role');
+  if (task.agent != null && !agentByRole.has(task.agent)) throw new Error('Invalid role');
   if (task.budget != null && (!Number.isSafeInteger(task.budget) || task.budget < 0)) throw new Error('Invalid budget');
   if (task.steps != null && (!Number.isSafeInteger(task.steps) || task.steps < 0)) throw new Error('Invalid steps');
   if (task.detail != null && (typeof task.detail !== 'string' || task.detail.length > 4000)) throw new Error('Invalid detail');

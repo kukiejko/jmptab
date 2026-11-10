@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { decideTask } from './workflow.mjs';
+import { agents } from './agents.mjs';
 import { readState, setPaused, stateDir } from './state.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -21,7 +22,7 @@ export function createDevboardServer({ directory = stateDir, tagRestore } = {}) 
       if (host && !/^127\.0\.0\.1(?::\d+)?$/.test(host) && !/^localhost(?::\d+)?$/.test(host)) return reply(response, 403, { error: 'Local access only' });
       const url = new URL(request.url, 'http://127.0.0.1');
       if (request.method === 'GET' && url.pathname === '/') return reply(response, 200, readFileSync(join(here, 'index.html'), 'utf8'), 'text/html; charset=utf-8');
-      if (request.method === 'GET' && url.pathname === '/api/state') return reply(response, 200, { ...readState(directory), version, startedAt });
+      if (request.method === 'GET' && url.pathname === '/api/state') return reply(response, 200, { ...readState(directory), agents, version, startedAt });
       if (request.method !== 'POST') return reply(response, 404, { error: 'Not found' });
       const origin = request.headers.origin;
       if (origin && origin !== `http://${host}`) return reply(response, 403, { error: 'Invalid origin' });

@@ -74,6 +74,31 @@ const layout = createResizableLayout({
   getPageSize: () => pageSize
 });
 
+const panes = document.querySelector('.panes');
+const worksheetCollapsedKey = 'jmptab-worksheet-collapsed';
+function fitChartToOutput() {
+  const output = $('outputScroll');
+  const result = $('results');
+  const top = result.getBoundingClientRect().top;
+  for (const figure of result.querySelectorAll('.graph-result-figure:not(.manual-figure-size)')) {
+    const offset = figure.getBoundingClientRect().top - top;
+    const height = Math.max(160, Math.round(output.clientHeight - offset - 24));
+    figure.style.setProperty('--auto-chart-height', `${height}px`);
+  }
+}
+function setWorksheetCollapsed(collapsed) {
+  panes.classList.toggle('worksheet-collapsed', collapsed);
+  $('showWorksheet').hidden = !collapsed;
+  $('hideWorksheet').hidden = collapsed;
+  $('paneResizer').setAttribute('aria-hidden', String(collapsed));
+  try { localStorage.setItem(worksheetCollapsedKey, String(collapsed)); } catch { /* Keep the current layout. */ }
+  requestAnimationFrame(fitChartToOutput);
+}
+$('hideWorksheet').addEventListener('click', () => setWorksheetCollapsed(true));
+$('showWorksheet').addEventListener('click', () => setWorksheetCollapsed(false));
+try { setWorksheetCollapsed(localStorage.getItem(worksheetCollapsedKey) === 'true'); } catch { setWorksheetCollapsed(false); }
+new ResizeObserver(fitChartToOutput).observe($('outputScroll'));
+
 function renderSheet() {
   if (data.formats) while (data.formats.length < data.headers.length) data.formats.push('auto');
   if (data.units) while (data.units.length < data.headers.length) data.units.push('');
@@ -1169,6 +1194,7 @@ function showResult(result) {
   ensureChartLegends($('results'));
   preparePlotSettingsButtons($('results'));
   applyFigureSizes($('results'), result.figureSizes || (result.figureSize ? [result.figureSize] : null));
+  requestAnimationFrame(fitChartToOutput);
   attachSurfaceRotation($('results'), result);
   lastReport = result.report;
   $('resultSubtitle').textContent = (result.label || names[result.type]) + ' · worksheet revision ' + result.revision;
@@ -1319,9 +1345,17 @@ $('plotSettingsForm').addEventListener('submit', event => {
 setupResultDragging($('results'), () => {
   if (activeResult) activeResult.html = $('results').innerHTML;
 });
-$('results').addEventListener('pointerup', event => {
+let figurePointerStart = null;
+$('results').addEventListener('pointerdown', event => {
   const figure = event.target.closest('.graph-result-figure');
-  if (!figure || !activeResult) return;
+  figurePointerStart = figure ? { figure, width: figure.offsetWidth, height: figure.offsetHeight } : null;
+});
+$('results').addEventListener('pointerup', event => {
+  const start = figurePointerStart;
+  figurePointerStart = null;
+  const figure = event.target.closest('.graph-result-figure');
+  if (!start || figure !== start.figure || !activeResult || (Math.abs(figure.offsetWidth - start.width) < 2 && Math.abs(figure.offsetHeight - start.height) < 2)) return;
+  figure.classList.add('manual-figure-size');
   activeResult.figureSizes = measureFigureSizes($('results'));
   activeResult.figureSize = activeResult.figureSizes[0];
 });

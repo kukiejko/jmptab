@@ -61,6 +61,7 @@
         <div class="pane-heading">
           <h2 id="outputTitle" tabindex="-1">Output Pane</h2>
           <span id="resultSubtitle"></span>
+          <button id="showWorksheet" type="button" hidden>Show Worksheet</button>
           <label class="scatter-drag-control" for="scatterDragMode" hidden>Drag <select id="scatterDragMode" aria-label="Scatterplot drag action"><option value="zoom">Zoom</option><option value="select">Select rows</option><option value="select-and-zoom">Select and zoom</option></select></label>
           <label class="x-angle-control" for="xLabelAngle">X labels <select id="xLabelAngle" aria-label="X label angle"><option value="0">0°</option><option value="-30">−30°</option><option value="-45">−45°</option><option value="-60">−60°</option><option value="-90">−90°</option><option value="30">30°</option><option value="45">45°</option><option value="60">60°</option><option value="90">90°</option></select></label>
           <button id="repeatAnalysisBtn" title="Repeat selected analysis with current worksheet data">Repeat analysis</button>
@@ -74,6 +75,7 @@
         <div class="pane-heading">
           <h2 id="sheetTitle">Worksheet</h2>
           <span id="sheetCount"></span>
+          <button id="hideWorksheet" type="button" title="Hide Worksheet to give the chart more space">Hide Worksheet</button>
           <span id="sheetSelectionStatus" class="sheet-selection-status" role="status"></span>
           <button id="markColumns" type="button" title="Mark all columns; click a C header to mark one, Shift-click for a range, Ctrl-click to add">Mark columns</button>
           <button id="copySelectedColumns" type="button" hidden>Copy selected</button>
